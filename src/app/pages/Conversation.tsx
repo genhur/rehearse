@@ -862,8 +862,13 @@ export function Conversation() {
     setCurrentAttempt(updatedAttempt);
   };
 
+  // Centralized function to end the current conversation
+  const endCurrentConversation = async () => {
+    await endCurrentAttempt();
+  };
+
   const handleEndConversation = () => {
-    endCurrentAttempt();
+    endCurrentConversation();
   };
 
   const handleViewFeedback = () => {
@@ -975,6 +980,14 @@ export function Conversation() {
     
     const lowerMessage = message.toLowerCase().trim();
     const naturalEndingPhrases = [
+      'simulation complete',
+      'good luck with the real conversation',
+      'take care',
+      'we\'ll stop here',
+      'that\'s the end of the rehearsal',
+      'ready for feedback',
+      'we can stop here',
+      'that feels like a good place to stop',
       'take care, and good luck with the real conversation',
       'good luck with the actual conversation',
       'i hope this practice helps with the real conversation',
@@ -998,12 +1011,12 @@ export function Conversation() {
     if (isNaturalEnding) {
       console.log('🏁 NATURAL_ENDING_DETECTED', { message: lowerMessage });
       
-      // Allow a brief moment for user to read the message, then end
+      // Wait 1 second for user to read the message, then end
       setTimeout(() => {
         if (isSessionActive) { // Check if still active
-          endCurrentAttempt();
+          endCurrentConversation();
         }
-      }, 3000); // 3 second delay to let user read the ending message
+      }, 1000); // 1 second delay as requested
     }
   };
 
@@ -1294,15 +1307,11 @@ export function Conversation() {
 
   // Extract the exact active condition used by the header
   const shouldShowActiveStatus = isSessionActive;
-  const shouldShowEndCall = shouldShowActiveStatus && !setupConversation;
+  const shouldShowEndCall = shouldShowActiveStatus;
 
   const getSessionStatus = (): 'active' | 'complete' | 'idle' => {
-    if (shouldShowActiveStatus) {
-      return 'active';
-    }
-    if (currentAttempt?.status === 'complete') {
-      return 'complete';
-    }
+    if (shouldShowActiveStatus) return 'active';
+    if (currentAttempt?.status === 'complete') return 'complete';
     return 'idle';
   };
 

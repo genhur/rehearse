@@ -155,19 +155,22 @@ export class AudioAnalysisService {
     try {
       console.log('🎤 GENERATING_FEEDBACK_REPORT');
 
+      // Create transcript with turn IDs for reference
       const transcript = messages
-        .map(m => `${m.role.toUpperCase()}: ${m.text}`)
+        .map(m => `[ID: ${m.id}] ${m.role.toUpperCase()}: ${m.text}`)
         .join('\n');
 
       const systemPrompt = `You are a communication coach analyzing a rehearsal conversation. The user practiced a difficult conversation scenario.
 
 You have access to:
-1. The full transcript
+1. The full transcript with turn IDs (shown as [ID: xyz])
 2. Audio analysis showing the user's vocal delivery patterns
 
 Generate feedback that helps the user understand both WHAT they communicated and HOW they came across.
 
 Focus on how the user likely sounded to the other person, not just the content of their words.
+
+For the replayMoment, identify a specific user turn from the transcript that would benefit from improvement. Use the exact turn ID from the transcript (the ID shown in brackets).
 
 Response format (JSON):
 {
@@ -176,6 +179,7 @@ Response format (JSON):
   "whatWorked": ["strength 1", "strength 2", "strength 3"],
   "opportunities": ["improvement 1", "improvement 2", "improvement 3"],
   "replayMoment": {
+    "turnId": "exact ID of the user turn from the transcript (if applicable)",
     "originalMoment": "quote from transcript",
     "howYouLikelySounded": "how this moment likely sounded",
     "howItMayHaveLanded": "how the other person likely received it",
@@ -186,7 +190,7 @@ Response format (JSON):
 
       const userPrompt = `Scenario: ${scenario}
 
-Transcript:
+Transcript with Turn IDs:
 ${transcript}
 
 Audio Analysis:

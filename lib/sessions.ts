@@ -43,6 +43,7 @@ export type FeedbackReport = {
   whatWorked: string[];
   opportunities: string[];
   replayMoment: {
+    turnId?: string;
     originalMoment: string;
     howYouLikelySounded: string;
     howItMayHaveLanded: string;

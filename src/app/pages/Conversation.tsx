@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
-import { useNavigate, useParams } from 'react-router';
+import { useNavigate, useParams, useOutletContext } from 'react-router';
 import { Button } from '../components/Button';
+import { AppHeader } from '../components/AppHeader';
 import { FeedbackRail } from '../components/FeedbackRail';
 import { getSession, updateSession, sessionManager, type RehearsalSession, type RehearsalAttempt, type TranscriptTurn, type AudioAnalysis, type FeedbackReport } from '../../../lib/sessions';
 import { SimpleVoiceOrb } from '../components/SimpleVoiceOrb';
@@ -14,9 +15,15 @@ const AGENT_ID = 'agent_4901ktej496kfp1a1kwj03q037ey';
 
 type ConversationState = 'idle' | 'listening' | 'thinking' | 'speaking';
 
+interface OutletContext {
+  openHistoryPanel: () => void;
+  isHistoryPanelOpen: boolean;
+}
+
 export function Conversation() {
   const navigate = useNavigate();
   const { sessionId } = useParams<{ sessionId: string }>();
+  const { openHistoryPanel } = useOutletContext<OutletContext>();
   const [session, setSession] = useState<RehearsalSession | null>(null);
   const [currentAttempt, setCurrentAttempt] = useState<RehearsalAttempt | null>(null);
   const [transcript, setTranscript] = useState<TranscriptTurn[]>([]);
@@ -727,65 +734,76 @@ export function Conversation() {
     );
   }
 
-  const stateLabels = {
-    idle: 'Ready to start',
-    listening: 'Listening...',
-    thinking: 'Thinking...',
-    speaking: 'Speaking...'
+  const getSessionTitle = (): string => {
+    if (!session) return 'Loading...';
+    
+    // Use the generated title if it's not the default intake question
+    if (session.title && session.title !== 'What difficult conversation are you avoiding today?') {
+      return session.title;
+    }
+    
+    // Use scenario if available
+    if (session.scenario && session.scenario !== 'What difficult conversation are you avoiding today?') {
+      return session.scenario.length > 50 ? session.scenario.substring(0, 47) + '...' : session.scenario;
+    }
+    
+    return 'Conversation Practice';
   };
 
-  const stateColors = {
-    idle: '#6b7280',
-    listening: '#10b981',
-    thinking: '#f59e0b',
-    speaking: '#3b82f6'
+  const getSessionSubtitle = (): string | undefined => {
+    if (!session) return undefined;
+    
+    // If this is the intake phase, show helper text
+    if (session.scenario === 'What difficult conversation are you avoiding today?') {
+      return 'Tell Rehearse what conversation you need to practice.';
+    }
+    
+    // Show conversation partner info
+    if (session.characterName && session.characterRole) {
+      return `Practice with ${session.characterName} · ${session.characterRole}`;
+    } else if (session.characterRole) {
+      return `Conversation with ${session.characterRole}`;
+    }
+    
+    return 'Conversation practice';
+  };
+
+  const getSessionStatus = (): 'active' | 'complete' | 'idle' => {
+    if (isSessionActive) return 'active';
+    if (currentAttempt?.status === 'complete') return 'complete';
+    return 'idle';
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col" style={{ '--header-height': '89px' } as React.CSSProperties}>
-      {/* Header */}
-      <div className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-full mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-lg font-medium">{session.scenario}</h1>
-              <p className="text-sm text-muted-foreground">
-                {session.scenario === 'What difficult conversation are you avoiding today?' 
-                  ? 'Tell Rehearse what conversation you need to practice.'
-                  : session.characterRole 
-                    ? `Conversation with ${session.characterRole}`
-                    : 'Conversation practice'
-                }
-              </p>
-            </div>
-            
+    <div className="min-h-screen bg-background flex flex-col" style={{ '--header-height': '137px' } as React.CSSProperties}>
+      {/* App Header */}
+      <AppHeader
+        title={getSessionTitle()}
+        subtitle={getSessionSubtitle()}
+        status={getSessionStatus()}
+        onHistoryClick={openHistoryPanel}
+      />
+
+      {/* Session Controls Bar */}
+      {(isSessionActive || currentAttempt?.status === 'complete') && (
+        <div className="border-b border-border bg-muted/20 px-6 py-3">
+          <div className="flex items-center justify-between max-w-full mx-auto">
             <div className="flex items-center gap-4">
               {/* Voice state indicator */}
-              <div className="flex items-center gap-2">
-                <div 
-                  className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: stateColors[conversationState] }}
-                />
-                <span className="text-sm text-muted-foreground">
-                  {stateLabels[conversationState]}
-                </span>
-              </div>
-              
-              {/* Key moments toggle - only shown after debrief */}
-              {currentAttempt?.debriefComplete && currentAttempt.keyMoments.length > 0 && (
-                <div className="hidden md:block">
-                  <Button
-                    onClick={() => setShowKeyMoments(!showKeyMoments)}
-                    variant={showKeyMoments ? 'default' : 'outline'}
-                    size="sm"
-                    className="flex items-center gap-2"
-                  >
-                    <Play className="w-4 h-4" />
-                    {currentAttempt.keyMoments.length} key moments
-                  </Button>
+              {isSessionActive && (
+                <div className="flex items-center gap-2">
+                  <div 
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: conversationState === 'idle' ? '#6b7280' : conversationState === 'listening' ? '#10b981' : conversationState === 'thinking' ? '#f59e0b' : '#3b82f6' }}
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    {conversationState === 'idle' ? 'Ready to start' : conversationState === 'listening' ? 'Listening...' : conversationState === 'thinking' ? 'Thinking...' : 'Speaking...'}
+                  </span>
                 </div>
               )}
-              
+            </div>
+            
+            <div className="flex items-center gap-3">
               {/* Always show End Call button for active or ending attempts */}
               {currentAttempt && (currentAttempt.status === 'active' || currentAttempt.status === 'ending') ? (
                 <Button
@@ -799,18 +817,15 @@ export function Conversation() {
                 </Button>
               ) : currentAttempt?.status === 'complete' ? (
                 <div className="text-right">
-                  <div className="text-sm text-muted-foreground">
-                    Duration: {calculateDuration()}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Messages: {transcript.length}
+                  <div className="text-xs text-muted-foreground">
+                    Duration: {calculateDuration()} · {transcript.length} messages
                   </div>
                 </div>
               ) : null}
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Main content with flex layout */}
       <div className="flex-1 flex">

@@ -1,7 +1,13 @@
 import { motion } from 'motion/react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useOutletContext } from 'react-router';
 import { VoiceOrb } from '../components/VoiceOrb';
+import { AppHeader } from '../components/AppHeader';
 import { createSession } from '../../../lib/sessions';
+
+interface OutletContext {
+  openHistoryPanel: () => void;
+  isHistoryPanelOpen: boolean;
+}
 
 const examples = [
   "I need to tell my cofounder the deal fell through and runway is tight.",
@@ -10,6 +16,7 @@ const examples = [
 
 export function Home() {
   const navigate = useNavigate();
+  const { openHistoryPanel } = useOutletContext<OutletContext>();
 
   const handleExampleClick = (example: string) => {
     console.log('EXAMPLE_CLICKED', example);
@@ -40,34 +47,27 @@ export function Home() {
   };
 
   return (
-    <div
-      className="min-h-screen bg-background flex flex-col items-center justify-center relative overflow-hidden"
-      style={{ padding: '5rem 1.5rem' }}
-    >
-      {/* Subtle ambient background glow */}
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            'radial-gradient(ellipse 60% 50% at 50% 42%, rgba(20,17,13,0.025), transparent)',
-        }}
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* App Header for Home */}
+      <AppHeader
+        showBackButton={false}
+        showHistoryButton={true}
+        onHistoryClick={openHistoryPanel}
       />
 
-      {/* Wordmark */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 1.2, delay: 0.2 }}
-        className="fixed top-8 left-1/2 -translate-x-1/2 select-none"
-        style={{
-          fontSize: '0.65rem',
-          letterSpacing: '0.22em',
-          textTransform: 'uppercase',
-          color: 'rgba(26,22,18,0.28)',
-        }}
+      {/* Main content */}
+      <div
+        className="flex-1 flex flex-col items-center justify-center relative overflow-hidden"
+        style={{ padding: '5rem 1.5rem' }}
       >
-        Rehearse
-      </motion.div>
+        {/* Subtle ambient background glow */}
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              'radial-gradient(ellipse 60% 50% at 50% 42%, rgba(20,17,13,0.025), transparent)',
+          }}
+        />
 
       <div className="max-w-[480px] w-full flex flex-col items-center relative z-10">
 

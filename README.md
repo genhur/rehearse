@@ -5,7 +5,7 @@ WIP / Functional prototype only
 
 Rehearse is a voice AI that helps people prepare for difficult conversations before they happen.
 
-Describe a conversation you're avoiding, practice it with an AI simulation, review what happened, and try again.
+Describe a conversation, practice it with an AI simulation, review what happened, and try again.
 
 The idea came from a simple observation: Many of the outcomes that shape our lives come down to our ability to have difficult conversations. The conversation where you set a boundary with someone you love. The conversation where you tell your team the company is in trouble. 
 

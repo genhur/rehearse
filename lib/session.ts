@@ -10,6 +10,7 @@ export interface Message {
     valence: number;
     arousal: number;
   };
+  hasCoachNote?: boolean;
 }
 
 export interface Session {

@@ -301,10 +301,7 @@ export function Conversation() {
             checkForUserDecline(message);
           }
           
-          // Check for natural conversation endings from assistant
-          if (speaker === 'agent') {
-            checkForNaturalEnding(message);
-          }
+          // Natural ending detection removed - users control via End Call button
           
           // Check for user readiness to start simulation in setup conversations
           if (speaker === 'user' && setupConversation) {
@@ -1399,59 +1396,7 @@ export function Conversation() {
     }
   };
 
-  const checkForNaturalEnding = (message: string) => {
-    // Only check assistant messages when session is actually in simulation phase
-    if (!session || !currentAttempt) return;
-    if (session.phase !== 'simulation') return;
-    if (session.status !== 'active') return;
-    if (currentAttempt.status !== 'active') return;
-    
-    // Require minimum conversation length before auto-ending
-    const totalTurns = transcript.length;
-    const userTurns = transcript.filter(turn => turn.speaker === 'user').length;
-    
-    if (totalTurns < 6) {
-      console.log('🏁 NATURAL_ENDING: Insufficient transcript length', { totalTurns, required: 6 });
-      return;
-    }
-    
-    if (userTurns < 2) {
-      console.log('🏁 NATURAL_ENDING: Insufficient user turns', { userTurns, required: 2 });
-      return;
-    }
-    
-    const lowerMessage = message.toLowerCase().trim();
-    
-    // Only strong closing phrases that indicate explicit simulation end
-    const strongClosingPhrases = [
-      'simulation complete',
-      'that\'s the end of the rehearsal',
-      'we can stop here',
-      'good luck with the real conversation',
-      'take care',
-      'want to run it again'
-    ];
-    
-    const isStrongClosing = strongClosingPhrases.some(phrase => 
-      lowerMessage.includes(phrase)
-    );
-    
-    if (isStrongClosing) {
-      console.log('🏁 NATURAL_ENDING_DETECTED', { 
-        message: lowerMessage, 
-        totalTurns, 
-        userTurns,
-        sessionPhase: session.phase,
-        sessionStatus: session.status,
-        attemptStatus: currentAttempt.status
-      });
-      
-      // DISABLED: Auto-ending for demo safety
-      // setTimeout(() => {
-      //   forceCompleteCurrentConversation();
-      // }, 1000);
-    }
-  };
+  // Natural ending detection completely removed - users control via End Call button
 
   const startInactivityTimeout = () => {
     // Clear any existing timeout
@@ -1669,8 +1614,7 @@ export function Conversation() {
         const aiTurn = sessionManager.addTranscriptTurn(sessionId, 'agent', response);
         setTranscript(prev => [...prev, aiTurn]);
         
-        // Check for natural ending in mock responses too
-        checkForNaturalEnding(response);
+        // Natural ending detection removed - users control via End Call button
       }
       
       setConversationState('listening');

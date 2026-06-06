@@ -4,7 +4,7 @@ import { useNavigate, useParams, useOutletContext } from 'react-router';
 import { Button } from '../components/Button';
 import { AppHeader } from '../components/AppHeader';
 import { FeedbackRail } from '../components/FeedbackRail';
-import { getSession, updateSession, sessionManager, getCurrentAttempt, getSetupConversation, updateSetupConversation, commitSetupToSession, endCurrentAttempt as endSessionAttempt, type RehearsalSession, type RehearsalAttempt, type SetupConversation, type TranscriptTurn, type AudioAnalysis, type FeedbackReport } from '../../../lib/sessions';
+import { getSession, updateSession, sessionManager, getCurrentAttempt, getSetupConversation, updateSetupConversation, commitSetupToSession, endCurrentAttempt as endSessionAttempt, type RehearsalSession, type RehearsalAttempt, type SetupConversation, type TranscriptTurn, type AudioAnalysis, type FeedbackReport, type RehearsalPhase } from '../../../lib/sessions';
 import { SimpleVoiceOrb } from '../components/SimpleVoiceOrb';
 import { Conversation as ElevenLabsConversation } from '@11labs/client';
 import type { Mode, Status } from '@11labs/client';
@@ -22,8 +22,11 @@ interface OutletContext {
 
 export function Conversation() {
   const navigate = useNavigate();
-  const { sessionId, setupId } = useParams<{ sessionId?: string; setupId?: string }>();
+  const params = useParams<{ sessionId?: string; setupId?: string }>();
+  const { sessionId, setupId } = params;
   const { openHistoryPanel } = useOutletContext<OutletContext>();
+  
+  console.log('🚀 SETUP: Conversation component params', { params, sessionId, setupId });
   const [session, setSession] = useState<RehearsalSession | null>(null);
   const [setupConversation, setSetupConversation] = useState<SetupConversation | null>(null);
   const [currentAttempt, setCurrentAttempt] = useState<RehearsalAttempt | null>(null);
@@ -45,13 +48,16 @@ export function Conversation() {
     // Setup conversations are never "active calls"
     if (setupConversation) return false;
     
+    // Only simulation phase sessions can have active calls
+    if (session?.phase !== 'simulation') return false;
+    
     const currentAttemptData = getCurrentAttempt(session);
     return session?.status === 'active' || 
            currentAttemptData?.status === 'active';
   };
 
   useEffect(() => {
-    console.log('CONVERSATION_PAGE_MOUNTED', { sessionId, setupId });
+    console.log('🚀 SETUP: CONVERSATION_PAGE_MOUNTED', { sessionId, setupId });
     
     // Handle setup conversation
     if (setupId) {
@@ -87,15 +93,21 @@ export function Conversation() {
 
     // Handle regular session
     if (!sessionId) {
+      console.log('🚀 SETUP: No sessionId, redirecting to home');
       navigate('/');
       return;
     }
 
+    console.log('🚀 SETUP: Loading session', { sessionId });
+    
     const sessionData = getSession(sessionId);
     if (!sessionData) {
+      console.error('🚀 SETUP: Session not found, redirecting to home', { sessionId });
       navigate('/');
       return;
     }
+
+    console.log('🚀 SETUP: Session found', { sessionData });
 
     setSession(sessionData);
     setSetupConversation(null);
@@ -105,18 +117,19 @@ export function Conversation() {
     setCurrentAttempt(currentAttemptData);
     setTranscript(currentAttemptData ? currentAttemptData.transcript : []);
     
-    // Add initial intake message if this is a new session with no transcript
-    if (sessionData.scenario === 'What difficult conversation are you avoiding today?' && 
-        (!currentAttemptData || currentAttemptData.transcript.length === 0)) {
-      const initialTurn = sessionManager.addTranscriptTurn(
-        sessionId,
-        'agent',
-        'What conversation do you need to rehearse?'
-      );
-      setTranscript([initialTurn]);
-      
-      // Auto-start conversation immediately
+    console.log('🚀 SETUP: Session state set', { 
+      phase: sessionData.phase, 
+      status: sessionData.status,
+      currentAttempt: currentAttemptData 
+    });
+    
+    // Auto-start simulation phase sessions
+    if (sessionData.phase === 'simulation' && 
+        currentAttemptData?.status === 'active' &&
+        (!currentAttemptData.transcript || currentAttemptData.transcript.length === 0)) {
+      console.log('🚀 SETUP: Auto-starting simulation phase session');
       setTimeout(() => {
+        console.log('🚀 SETUP: Auto-start timeout complete, calling handleStartConversation');
         handleStartConversation();
       }, 500);
     }
@@ -135,7 +148,8 @@ export function Conversation() {
   }, []);
 
   const handleStartConversation = async () => {
-    if (!sessionId) return;
+    // Support both regular sessions and setup conversations
+    if (!sessionId && !setupId) return;
     
     setIsSessionActive(true);
     setConversationState('listening');
@@ -195,13 +209,16 @@ export function Conversation() {
             checkForNaturalEnding(message);
           }
           
+          // Check for user readiness to start simulation in setup conversations
+          if (speaker === 'user' && setupConversation) {
+            checkForSimulationReadiness(message);
+          }
+          
           // No live coaching during active conversation
           
-          // Handle intake flow progression
-          if (speaker === 'user' && (
-            (session?.scenario === 'What difficult conversation are you avoiding today?') ||
-            (setupConversation?.scenarioDraft === 'What difficult conversation are you avoiding today?')
-          )) {
+          // Handle intake flow progression (setup conversations only)
+          if (speaker === 'user' && 
+              setupConversation?.scenarioDraft === 'What difficult conversation are you avoiding today?') {
             handleIntakeResponse(message);
           }
         }
@@ -497,40 +514,113 @@ export function Conversation() {
         scenario: userMessage 
       });
       
-      // Check if we have enough information to commit to a session
-      // For now, commit after the user provides their scenario
-      if (updatedSetup.clarificationTranscript.length >= 2 && // At least one exchange
-          userMessage !== 'What difficult conversation are you avoiding today?' &&
-          userMessage.length > 10) { // User provided meaningful scenario
-        
-        console.log('[Conversation] Setup ready to commit to session');
-        
-        // Mark setup as ready and commit in next AI response
-        const readySetup = { ...updatedSetup, isReadyToStart: true };
-        updateSetupConversation(readySetup);
-        setSetupConversation(readySetup);
-      }
+      // Setup transition now handled by explicit user confirmation or Start simulation button
+      // No automatic transition based on transcript length
       
       return;
     }
     
-    // Legacy handling for existing sessions (this shouldn't happen with new flow)
-    if (!sessionId || !session) return;
+    // Sessions should not handle intake - this is now only for setup conversations
+    console.log('[Conversation] WARNING: Session received intake response, but intake should only happen in setup conversations');
+  };
+
+  const startSimulationFromSetup = async () => {
+    console.log('🚀 SETUP: startSimulationFromSetup called');
     
-    // Update session with the user's scenario
-    const updatedSession = { 
-      ...session, 
-      scenario: userMessage,
-      title: userMessage.length > 50 ? userMessage.substring(0, 47) + '...' : userMessage
-    };
+    if (!setupConversation || !setupId) {
+      console.error('🚀 SETUP: missing setupConversation or setupId', { setupConversation, setupId });
+      return;
+    }
     
-    updateSession(updatedSession);
-    setSession(updatedSession);
+    try {
+      console.log('🚀 SETUP: extracting user scenario');
+      
+      // Extract the scenario from the user's transcript
+      const userScenario = getUserScenarioFromTranscript(setupConversation.clarificationTranscript);
+      
+      if (!userScenario || userScenario.length < 10) {
+        console.error('🚀 SETUP: No valid scenario found', { scenario: userScenario });
+        return;
+      }
+      
+      console.log('🚀 SETUP: scenario extracted successfully', { scenario: userScenario });
+      
+      // Extract character information from the scenario
+      const characterInfo = extractCharacterFromScenario(userScenario);
+      console.log('🚀 SETUP: character info extracted', characterInfo);
+      
+      // Create the setup conversation with the extracted scenario and character info
+      const updatedSetup = {
+        ...setupConversation,
+        scenarioDraft: userScenario,
+        characterRole: characterInfo.role,
+        characterName: characterInfo.name,
+        isReadyToStart: true
+      };
+      
+      console.log('🚀 SETUP: updating setup conversation');
+      updateSetupConversation(updatedSetup);
+      
+      console.log('🚀 SETUP: calling commitSetupToSession');
+      
+      // Commit the setup conversation to a real session
+      const newSession = commitSetupToSession(setupId);
+      
+      console.log('🚀 SETUP: session created', { sessionId: newSession.id, session: newSession });
+      
+      console.log('🚀 SETUP: navigation starting');
+      
+      const targetUrl = `/conversation/${newSession.id}`;
+      console.log('🚀 SETUP: navigating to URL', { targetUrl });
+      
+      // Navigate to the new session - it will auto-start since it's a simulation phase session
+      navigate(targetUrl);
+      
+      console.log('🚀 SETUP: navigate() function called');
+      
+    } catch (error) {
+      console.error('🚀 SETUP: Failed to start simulation from setup:', error);
+    }
+  };
+
+  // Helper function to extract user scenario from transcript
+  const getUserScenarioFromTranscript = (transcript: TranscriptTurn[]): string => {
+    // Find the first substantial user response that isn't the initial question
+    for (const turn of transcript) {
+      if (turn.speaker === 'user' && 
+          turn.text !== 'What difficult conversation are you avoiding today?' &&
+          turn.text.length > 10) {
+        return turn.text;
+      }
+    }
+    return '';
+  };
+
+  // Helper function to extract character information from scenario text
+  const extractCharacterFromScenario = (scenario: string): { name: string; role: string } => {
+    const lowerScenario = scenario.toLowerCase();
     
-    console.log('[Conversation] Updated session with user scenario:', { 
-      scenario: userMessage,
-      title: updatedSession.title 
-    });
+    // Common relationship patterns
+    const patterns = [
+      { pattern: /(?:my )?cofounder|co-founder/, role: 'Co-founder', name: 'Alex' },
+      { pattern: /(?:my )?manager|boss|supervisor/, role: 'Manager', name: 'Manager' },
+      { pattern: /(?:my )?partner|boyfriend|girlfriend|spouse/, role: 'Partner', name: 'Partner' },
+      { pattern: /(?:my )?employee|team member|subordinate/, role: 'Team Member', name: 'Team Member' },
+      { pattern: /(?:my )?client|customer/, role: 'Client', name: 'Client' },
+      { pattern: /(?:my )?investor/, role: 'Investor', name: 'Investor' },
+      { pattern: /(?:my )?parent|mother|father|mom|dad/, role: 'Parent', name: 'Parent' },
+      { pattern: /(?:my )?friend/, role: 'Friend', name: 'Friend' },
+      { pattern: /(?:my )?roommate/, role: 'Roommate', name: 'Roommate' },
+    ];
+    
+    for (const { pattern, role, name } of patterns) {
+      if (pattern.test(lowerScenario)) {
+        return { role, name };
+      }
+    }
+    
+    // Default fallback
+    return { role: 'Conversation Partner', name: 'Alex' };
   };
 
   const commitSetupToSessionAndRedirect = async () => {
@@ -819,6 +909,52 @@ export function Conversation() {
     }
   };
 
+  const checkForSimulationReadiness = (message: string) => {
+    if (!setupConversation || !setupId) return;
+    
+    const lowerMessage = message.toLowerCase().trim();
+    const readinessConfirmations = [
+      'yes',
+      'ready',
+      'let\'s do it',
+      'let\'s start',
+      'begin',
+      'start',
+      'i\'m ready',
+      'let\'s begin',
+      'go ahead',
+      'sure',
+      'okay',
+      'ok',
+      'yes, ready',
+      'ready to begin',
+      'let\'s practice',
+      'start the simulation'
+    ];
+    
+    const isReady = readinessConfirmations.some(phrase => 
+      lowerMessage === phrase || lowerMessage.startsWith(phrase + ' ')
+    );
+    
+    if (isReady) {
+      console.log('🚀 SETUP: user confirmed readiness', { message: lowerMessage });
+      
+      // Check if we have a scenario to work with
+      const userScenario = getUserScenarioFromTranscript(setupConversation.clarificationTranscript);
+      
+      if (userScenario && userScenario.length > 10) {
+        console.log('🚀 SETUP: scenario found, scheduling simulation start', { scenario: userScenario });
+        // Allow a brief moment for the confirmation message, then start simulation
+        setTimeout(() => {
+          console.log('🚀 SETUP: timeout complete, calling startSimulationFromSetup');
+          startSimulationFromSetup();
+        }, 1000); // 1 second delay
+      } else {
+        console.log('🚀 SETUP: USER_READY_BUT_NO_SCENARIO', { scenario: userScenario });
+      }
+    }
+  };
+
   const calculateDuration = () => {
     if (!session || transcript.length === 0) return '0s';
     
@@ -879,11 +1015,15 @@ export function Conversation() {
     // Check for user decline in mock inputs too
     checkForUserDecline(text);
     
+    // Check for user readiness in setup conversations
+    if (setupConversation) {
+      checkForSimulationReadiness(text);
+    }
+    
     // No live coaching during conversation
     
-    // Handle intake response for mock too
-    if ((session?.scenario === 'What difficult conversation are you avoiding today?') ||
-        (setupConversation?.scenarioDraft === 'What difficult conversation are you avoiding today?')) {
+    // Handle intake response for mock too (setup conversations only)
+    if (setupConversation?.scenarioDraft === 'What difficult conversation are you avoiding today?') {
       handleIntakeResponse(text);
     }
     
@@ -893,14 +1033,27 @@ export function Conversation() {
     setTimeout(() => {
       let responses: string[];
       
-      if ((session?.scenario === 'What difficult conversation are you avoiding today?') ||
-          (setupConversation?.scenarioDraft === 'What difficult conversation are you avoiding today?')) {
-        responses = [
-          "That sounds important. Who do you need to have this conversation with?",
-          "I understand. What outcome are you hoping for from this conversation?",
-          "That's a significant topic. What are you most worried might happen during this conversation?",
-          "Got it. I'll help you practice this. What's your main goal for this conversation?"
-        ];
+      if (setupConversation?.scenarioDraft === 'What difficult conversation are you avoiding today?') {
+        // Check if we already have a user scenario in the transcript
+        const userScenario = getUserScenarioFromTranscript(setupConversation.clarificationTranscript);
+        
+        if (userScenario && userScenario.length > 10) {
+          // User has provided a scenario, ask if they're ready
+          responses = [
+            "Got it. I understand you need to have this conversation. Ready to begin the practice session?",
+            "That sounds like an important conversation. Shall we start practicing this scenario?",
+            "I can help you prepare for that. Are you ready to begin the roleplay?",
+            "Understood. Let's practice this conversation. Ready to start?"
+          ];
+        } else {
+          // Still gathering info
+          responses = [
+            "That sounds important. Who do you need to have this conversation with?",
+            "I understand. What outcome are you hoping for from this conversation?",
+            "That's a significant topic. What are you most worried might happen during this conversation?",
+            "Got it. I'll help you practice this. What's your main goal for this conversation?"
+          ];
+        }
       } else {
         responses = [
           "I can understand why that would be concerning. Can you tell me more about your specific worries?",
@@ -922,14 +1075,8 @@ export function Conversation() {
         const aiTurn = sessionManager.addSetupTranscriptTurn(setupId, 'agent', response);
         setTranscript(prev => [...prev, aiTurn]);
         
-        // Check if setup is ready to transition to session
-        if (setupConversation.isReadyToStart) {
-          console.log('[Conversation] Setup is ready, will transition after this response');
-          // Transition after a short delay to let user see the response
-          setTimeout(() => {
-            commitSetupToSessionAndRedirect();
-          }, 2000);
-        }
+        // Setup transition now handled via user confirmation or Start simulation button
+        // No automatic transition in AI response
       } else if (sessionId) {
         const aiTurn = sessionManager.addTranscriptTurn(sessionId, 'agent', response);
         setTranscript(prev => [...prev, aiTurn]);
@@ -1118,6 +1265,38 @@ export function Conversation() {
             )}
           </div>
 
+          {/* Setup conversation readiness bar */}
+          {setupConversation && getUserScenarioFromTranscript(setupConversation.clarificationTranscript) && (
+            <div className="border-t border-border bg-card/50 p-4">
+              <div className={`mx-auto transition-all duration-300 ${
+                isFeedbackOpen ? 'max-w-3xl' : 'max-w-4xl'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                      <Play className="w-3 h-3 text-white" />
+                    </div>
+                    <span className="font-medium text-sm">Ready to start your practice session?</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      onClick={() => {
+                        console.log('🚀 SETUP: Start simulation button clicked');
+                        startSimulationFromSetup();
+                      }}
+                      variant="default"
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      <Play className="w-4 h-4 mr-2" />
+                      Start simulation
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Conversation completion bar */}
           {currentAttempt?.status === 'complete' && !isGeneratingFeedback && (
             <div className="border-t border-border bg-card/50 p-4">
@@ -1174,18 +1353,23 @@ export function Conversation() {
           )}
 
           {/* Voice interaction area */}
-          {isSessionActive && (
+          {(isSessionActive || Boolean(setupConversation)) && (
             <div className="border-t border-border bg-card/50 backdrop-blur-sm p-6">
               <div className={`max-w-4xl mx-auto transition-all duration-300 ${
                 isFeedbackOpen ? 'max-w-3xl' : 'max-w-4xl'
               }`}>
                 <div className="flex items-center justify-center">
                   <div className="text-center">
-                    <SimpleVoiceOrb state={conversationState} />
+                    <SimpleVoiceOrb 
+                      state={conversationState} 
+                      onClick={handleStartConversation}
+                      clickable={setupConversation ? !isSessionActive : false}
+                    />
                     <p className="text-sm text-muted-foreground mt-4">
                       {conversationState === 'listening' && 'Speak naturally'}
                       {conversationState === 'thinking' && 'Processing your response...'}
                       {conversationState === 'speaking' && 'AI is responding...'}
+                      {setupConversation && conversationState === 'idle' && 'Tap to start voice conversation'}
                     </p>
                   </div>
                 </div>

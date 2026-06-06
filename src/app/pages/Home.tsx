@@ -32,13 +32,15 @@ export function Home() {
   };
 
   const handleStartNewRehearsal = () => {
-    // Create a real committed session for immediate roleplay
-    const session = createSession(
+    // Create a setup conversation for intake, not a persisted session
+    const setupConversation = createSetupConversation(
       'What difficult conversation are you avoiding today?'
     );
     
-    // Navigate to the committed session
-    navigate(`/conversation/${session.id}`);
+    console.log('SETUP_CREATED_FROM_VOICE_ORB', setupConversation);
+    
+    // Navigate to setup conversation
+    navigate(`/conversation/setup/${setupConversation.id}`);
   };
 
   return (

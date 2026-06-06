@@ -2,11 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { useNavigate, useParams } from 'react-router';
 import { Button } from '../components/Button';
-import { sessionStorage, Session, Message, Annotation, KeyMoment } from '../../../lib/session';
+import { sessionStorage, Session, RehearsalAttempt, Message, Annotation, KeyMoment, AudioAnalysis, FeedbackReport } from '../../../lib/session';
 import { SimpleVoiceOrb } from '../components/SimpleVoiceOrb';
 import { Conversation as ElevenLabsConversation } from '@11labs/client';
 import type { Mode, Status } from '@11labs/client';
-import { Phone, PhoneOff, Play } from 'lucide-react';
+import { Phone, PhoneOff, Play, Mic } from 'lucide-react';
+import { audioRecordingService, audioAnalysisService } from '../../../lib/audio-analysis';
 
 const AGENT_ID = 'agent_4901ktej496kfp1a1kwj03q037ey';
 
@@ -16,12 +17,15 @@ export function Conversation() {
   const navigate = useNavigate();
   const { sessionId } = useParams<{ sessionId: string }>();
   const [session, setSession] = useState<Session | null>(null);
+  const [currentAttempt, setCurrentAttempt] = useState<RehearsalAttempt | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversationState, setConversationState] = useState<ConversationState>('idle');
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [elevenLabsMode, setElevenLabsMode] = useState<Mode>('listening');
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const [showKeyMoments, setShowKeyMoments] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const conversationRef = useRef<ElevenLabsConversation | null>(null);
 
@@ -40,12 +44,14 @@ export function Conversation() {
     }
 
     setSession(sessionData);
-    setMessages(sessionData.messages);
     
-    // No live coaching during conversation - annotations come post-debrief
+    // Get current attempt
+    const currentAttemptData = sessionStorage.getCurrentAttempt(sessionId);
+    setCurrentAttempt(currentAttemptData);
+    setMessages(currentAttemptData ? currentAttemptData.messages : []);
     
     // Add initial intake message if this is a new intake session
-    if (sessionData.phase === 'intake' && sessionData.messages.length === 0) {
+    if (sessionData.phase === 'intake' && (!currentAttemptData || currentAttemptData.messages.length === 0)) {
       const initialMessage = sessionStorage.addMessage(
         sessionId,
         'assistant',
@@ -70,6 +76,12 @@ export function Conversation() {
     
     setIsSessionActive(true);
     setConversationState('listening');
+    
+    // Start audio recording
+    const recordingStarted = await audioRecordingService.startRecording();
+    if (recordingStarted) {
+      setIsRecording(true);
+    }
     
     try {
       const conversation = await ElevenLabsConversation.startSession({
@@ -104,6 +116,11 @@ export function Conversation() {
             sessionId 
           });
           
+          // Check for user decline phrases
+          if (role === 'user') {
+            checkForUserDecline(message);
+          }
+          
           // No live coaching during active conversation
           
           // Handle intake flow progression
@@ -127,56 +144,78 @@ export function Conversation() {
   const generateAnnotations = async () => {
     if (!session || !sessionId) return;
     
-    // Generate 2-4 annotations for key moments in the conversation
-    const userMessages = messages.filter(m => m.role === 'user');
-    if (userMessages.length === 0) return;
+    // Analyze communication moments from the full conversation
+    const communicationMoments = identifyCommunicationMoments(messages);
     
-    // Mock annotations for now - in real app, this would call AI service
-    const mockAnnotations = [
-      {
-        messageId: userMessages[Math.floor(userMessages.length * 0.3)]?.id || userMessages[0].id,
-        title: 'Vague answer',
-        body: 'Your cofounder was asking for a concrete runway number.',
-        type: 'vague_answer' as const
-      },
-      {
-        messageId: userMessages[Math.floor(userMessages.length * 0.7)]?.id || userMessages[userMessages.length - 1].id,
-        title: 'Strong ownership',
-        body: 'You acknowledged responsibility directly.',
-        type: 'strong_ownership' as const
-      }
-    ];
+    console.log('🎯 COMMUNICATION_MOMENTS_ANALYSIS', {
+      totalMessages: messages.length,
+      momentsFound: communicationMoments.length,
+      moments: communicationMoments.map(m => ({
+        title: m.title,
+        significance: m.significance,
+        type: m.type
+      }))
+    });
+    
+    if (communicationMoments.length === 0) {
+      console.log('🎯 NO_COMMUNICATION_MOMENTS_FOUND');
+      // Mark debrief complete even if no moments found
+      sessionStorage.markDebriefComplete(sessionId);
+      setCurrentAttempt(prev => prev ? { ...prev, debriefComplete: true } : null);
+      setSession(prev => prev ? {
+        ...prev,
+        attempts: prev.attempts.map(attempt => 
+          attempt.id === prev.currentAttemptId
+            ? { ...attempt, debriefComplete: true }
+            : attempt
+        )
+      } : null);
+      return;
+    }
+    
+    // Generate annotations for the most significant moments (2-4 max)
+    const topMoments = communicationMoments.slice(0, 3);
     
     const annotations: Annotation[] = [];
     const keyMoments: KeyMoment[] = [];
     
-    mockAnnotations.forEach((mock, index) => {
+    topMoments.forEach((moment) => {
       const annotation = sessionStorage.addAnnotation(
         sessionId,
-        mock.messageId,
-        mock.title,
-        mock.body,
-        mock.type
+        moment.userMessageId,
+        moment.title,
+        moment.description,
+        moment.type
       );
       
       const keyMoment = sessionStorage.addKeyMoment(
         sessionId,
         annotation.id,
-        mock.messageId,
-        mock.title,
-        mock.body
+        moment.userMessageId,
+        moment.title,
+        moment.description
       );
       
       annotations.push(annotation);
       keyMoments.push(keyMoment);
     });
     
-    // Update local session state
-    setSession(prev => prev ? {
+    // Update local attempt state
+    setCurrentAttempt(prev => prev ? {
       ...prev,
       debriefComplete: true,
       annotations,
       keyMoments
+    } : null);
+    
+    // Update session state as well
+    setSession(prev => prev ? {
+      ...prev,
+      attempts: prev.attempts.map(attempt => 
+        attempt.id === prev.currentAttemptId
+          ? { ...attempt, debriefComplete: true, annotations, keyMoments }
+          : attempt
+      )
     } : null);
     
     // Update messages to show annotation flags
@@ -184,6 +223,186 @@ export function Conversation() {
       ...m,
       hasAnnotation: annotations.some(a => a.messageId === m.id)
     })));
+  };
+
+  const identifyCommunicationMoments = (messages: Message[]) => {
+    const moments: Array<{
+      userMessageId: string;
+      title: string;
+      description: string;
+      type: Annotation['type'];
+      significance: number;
+    }> = [];
+
+    // Only analyze if we have meaningful conversation (skip single exchanges)
+    if (messages.length < 4) return [];
+
+    // Look for meaningful assistant-user interaction patterns
+    for (let i = 1; i < messages.length - 1; i++) {
+      const currentMsg = messages[i];
+      const nextMsg = messages[i + 1];
+      
+      // Focus on assistant questions/challenges followed by user responses
+      if (currentMsg.role === 'assistant' && nextMsg.role === 'user') {
+        const assistantText = currentMsg.text.toLowerCase();
+        const userText = nextMsg.text.toLowerCase();
+        
+        // Get broader context (4 messages around this interaction)
+        const contextStart = Math.max(0, i - 2);
+        const contextEnd = Math.min(messages.length, i + 3);
+        const context = messages.slice(contextStart, contextEnd);
+        
+        // Skip very short or generic responses
+        if (userText.length < 10 || isGenericResponse(userText)) {
+          continue;
+        }
+        
+        // Analyze the communication moment
+        const moment = analyzeCommunicationMoment(assistantText, userText, nextMsg.id, context);
+        if (moment) {
+          // Avoid duplicate moments about the same message
+          const existingMoment = moments.find(m => m.userMessageId === nextMsg.id);
+          if (!existingMoment || moment.significance > existingMoment.significance) {
+            if (existingMoment) {
+              moments.splice(moments.indexOf(existingMoment), 1);
+            }
+            moments.push(moment);
+          }
+        }
+      }
+    }
+
+    // Sort by significance and return top 3 moments
+    return moments
+      .sort((a, b) => b.significance - a.significance)
+      .filter(m => m.significance > 0.6) // Higher threshold for quality
+      .slice(0, 3); // Maximum 3 moments
+  };
+
+  const isGenericResponse = (text: string): boolean => {
+    const genericPhrases = ['okay', 'yes', 'no', 'sure', 'thanks', 'alright', 'got it', 'yeah'];
+    return genericPhrases.some(phrase => text.trim() === phrase);
+  };
+
+  const analyzeCommunicationMoment = (
+    assistantText: string, 
+    userText: string, 
+    userMessageId: string,
+    context: Message[]
+  ) => {
+    // Look for patterns that indicate communication choices
+    
+    // Pattern 1: Specific questions met with vague answers
+    const isSpecificQuestion = assistantText.includes('?') && 
+      (assistantText.includes('how much') || assistantText.includes('when') || 
+       assistantText.includes('what exactly') || assistantText.includes('how many') ||
+       assistantText.includes('which') || assistantText.includes('what\'s the'));
+       
+    const isVagueAnswer = userText.includes('maybe') || userText.includes('around') || 
+      userText.includes('roughly') || userText.includes('i think') || userText.includes('probably') ||
+      userText.includes('sort of') || userText.includes('kind of') || userText.includes('about');
+      
+    if (isSpecificQuestion && isVagueAnswer) {
+      return {
+        userMessageId,
+        title: 'Vague answer',
+        description: 'You gave an imprecise response when they asked for specifics.',
+        type: 'vague_answer' as const,
+        significance: 0.9
+      };
+    }
+
+    // Pattern 2: Accountability when challenged
+    const isChallenge = assistantText.includes('what happened') || assistantText.includes('why did') || 
+      assistantText.includes('how could') || assistantText.includes('your responsibility') ||
+      assistantText.includes('you said you would');
+      
+    const showsOwnership = userText.includes('i should have') || userText.includes('my mistake') || 
+      userText.includes('i was wrong') || userText.includes('i take responsibility') ||
+      userText.includes('that\'s on me');
+      
+    const deflects = userText.includes('but ') || userText.includes('however') || 
+      userText.includes('it wasn\'t my') || userText.includes('they didn\'t');
+      
+    if (isChallenge && showsOwnership && !deflects) {
+      return {
+        userMessageId,
+        title: 'Strong ownership',
+        description: 'You acknowledged responsibility without deflecting.',
+        type: 'strong_ownership' as const,
+        significance: 0.8
+      };
+    }
+
+    // Pattern 3: Emotional regulation under pressure
+    const expressesEmotion = assistantText.includes('upset') || assistantText.includes('angry') || 
+      assistantText.includes('frustrated') || assistantText.includes('disappointed') ||
+      assistantText.includes('can\'t believe') || assistantText.includes('this is unacceptable');
+      
+    const staysComposed = !userText.includes('calm down') && !userText.includes('don\'t be') &&
+      (userText.includes('understand') || userText.includes('i can see') || 
+       userText.includes('let me explain') || userText.includes('i hear'));
+       
+    if (expressesEmotion && staysComposed) {
+      return {
+        userMessageId,
+        title: 'Stayed calm',
+        description: 'You remained composed when they expressed frustration.',
+        type: 'stayed_calm' as const,
+        significance: 0.8
+      };
+    }
+
+    // Pattern 4: Acknowledging concerns vs jumping to solutions
+    const sharesConcern = assistantText.includes('worried') || assistantText.includes('concerned') || 
+      assistantText.includes('i feel') || assistantText.includes('makes me');
+      
+    const acknowledgesFirst = userText.includes('i understand') || userText.includes('i can see') || 
+      userText.includes('that makes sense') || userText.includes('i hear what you\'re saying');
+      
+    const jumpsStraightToSolution = userText.includes('we can') || userText.includes('let me') || 
+      userText.includes('i\'ll fix') || userText.includes('here\'s what we\'ll do');
+      
+    if (sharesConcern && acknowledgesFirst) {
+      return {
+        userMessageId,
+        title: 'Good acknowledgment',
+        description: 'You acknowledged their concern before responding.',
+        type: 'acknowledged_concern' as const,
+        significance: 0.7
+      };
+    }
+    
+    if (sharesConcern && jumpsStraightToSolution && !acknowledgesFirst) {
+      return {
+        userMessageId,
+        title: 'Premature problem-solving',
+        description: 'You jumped to solutions before acknowledging their concern.',
+        type: 'premature_problem_solving' as const,
+        significance: 0.6
+      };
+    }
+
+    // Pattern 5: Clear, direct communication
+    const asksForSomething = assistantText.includes('what do you need') || 
+      assistantText.includes('what are you asking');
+      
+    const makesClearAsk = !isVagueAnswer && (
+      userText.includes('i need') || userText.includes('i\'m asking for') || 
+      userText.includes('specifically') || userText.includes('exactly'));
+      
+    if (asksForSomething && makesClearAsk) {
+      return {
+        userMessageId,
+        title: 'Clear ask',
+        description: 'You made a direct, specific request.',
+        type: 'clear_ask' as const,
+        significance: 0.7
+      };
+    }
+
+    // No significant communication moment found
+    return null;
   };
 
   const handleIntakeResponse = (userMessage: string) => {
@@ -236,8 +455,67 @@ export function Conversation() {
     console.log('[Conversation] Updated session:', { newTitle, inferredRole });
   };
 
-  const handleEndConversation = async () => {
+  const generateFeedbackReport = async (audioBlob: Blob | null) => {
+    if (!sessionId || !session || messages.length === 0) return;
+    
+    console.log('🎤 GENERATING_FEEDBACK_REPORT', { 
+      sessionId, 
+      messagesCount: messages.length,
+      hasAudio: !!audioBlob 
+    });
+    
+    setIsGeneratingFeedback(true);
+    
+    try {
+      // Step 1: Analyze audio if available
+      let audioAnalysis: AudioAnalysis | null = null;
+      if (audioBlob) {
+        console.log('🎤 ANALYZING_AUDIO');
+        audioAnalysis = await audioAnalysisService.analyzeAudio(audioBlob);
+      }
+      
+      // Step 2: Generate combined feedback report
+      console.log('🎤 GENERATING_COMBINED_FEEDBACK');
+      const feedbackReport = await audioAnalysisService.generateFeedbackReport(
+        messages,
+        audioAnalysis,
+        session.scenario
+      );
+      
+      // Step 3: Store results in the attempt
+      const updatedAttempt = sessionStorage.getCurrentAttempt(sessionId);
+      if (updatedAttempt && feedbackReport) {
+        updatedAttempt.audioAnalysis = audioAnalysis || undefined;
+        updatedAttempt.feedbackReport = feedbackReport;
+        
+        // Update local state
+        setCurrentAttempt(updatedAttempt);
+        setSession(prev => prev ? {
+          ...prev,
+          attempts: prev.attempts.map(attempt => 
+            attempt.id === prev.currentAttemptId
+              ? { ...attempt, audioAnalysis, feedbackReport }
+              : attempt
+          )
+        } : null);
+        
+        console.log('🎤 FEEDBACK_REPORT_COMPLETE', {
+          audioAnalysis: audioAnalysis?.primaryEmotion,
+          howYouCameAcross: feedbackReport.howYouCameAcross
+        });
+      }
+      
+    } catch (error) {
+      console.error('🎤 FEEDBACK_GENERATION_ERROR', error);
+    } finally {
+      setIsGeneratingFeedback(false);
+    }
+  };
+
+  const endCurrentAttempt = async () => {
     if (!sessionId) return;
+    
+    console.log('🔚 ENDING_CURRENT_ATTEMPT', { sessionId });
     
     // End ElevenLabs conversation
     if (conversationRef.current) {
@@ -248,16 +526,38 @@ export function Conversation() {
     setIsSessionActive(false);
     setConversationState('idle');
     
-    // Update session status to completed
-    sessionStorage.updateSessionStatus(sessionId, 'completed');
+    // Stop audio recording and process
+    let audioBlob: Blob | null = null;
+    if (isRecording) {
+      audioBlob = await audioRecordingService.stopRecording();
+      setIsRecording(false);
+    }
     
-    // Update local session state to reflect completion
-    setSession(prev => prev ? { ...prev, status: 'completed' } : null);
+    // Update attempt status to completed using centralized function
+    sessionStorage.endCurrentAttempt(sessionId);
     
-    // Generate annotations after a brief delay to let the debrief finish
-    setTimeout(() => {
-      generateAnnotations();
-    }, 3000);
+    // Store audio recording if available
+    if (audioBlob && currentAttempt) {
+      // Note: In a real app, you'd store this in a more persistent way
+      currentAttempt.audioRecording = audioBlob;
+    }
+    
+    // Update local state
+    const updatedSession = sessionStorage.getSession(sessionId);
+    const updatedAttempt = sessionStorage.getCurrentAttempt(sessionId);
+    
+    setSession(updatedSession);
+    setCurrentAttempt(updatedAttempt);
+    
+    // Generate feedback report with audio analysis
+    await generateFeedbackReport(audioBlob);
+    
+    // Then generate annotations (communication moment analysis)
+    await generateAnnotations();
+  };
+
+  const handleEndConversation = () => {
+    endCurrentAttempt();
   };
 
   const handleViewDebrief = () => {
@@ -266,18 +566,33 @@ export function Conversation() {
   };
 
   const handleRunItAgain = () => {
-    if (!session) return;
+    if (!session || !sessionId) return;
     
-    // Create a new session with the same setup
-    const newSession = sessionStorage.createSession(
-      session.scenario,
-      session.role,
-      session.goal,
-      session.worry
-    );
+    console.log('🔄 CREATING_NEW_ATTEMPT', { sessionId });
     
-    // Navigate to the new conversation
-    navigate(`/conversation/${newSession.id}`);
+    // Create a new attempt within the same session
+    const newAttempt = sessionStorage.createNewAttempt(sessionId);
+    
+    if (newAttempt) {
+      // Update local state with new attempt
+      const updatedSession = sessionStorage.getSession(sessionId);
+      setSession(updatedSession);
+      setCurrentAttempt(newAttempt);
+      setMessages([]);
+      setShowKeyMoments(false);
+      
+      // Reset conversation state for new attempt
+      setConversationState('idle');
+      setIsSessionActive(false);
+      
+      // Clear any highlighting
+      setHighlightedMessageId(null);
+      
+      // Auto-start the new conversation attempt
+      setTimeout(() => {
+        handleStartConversation();
+      }, 500);
+    }
   };
 
   const handleBackHome = () => {
@@ -303,6 +618,37 @@ export function Conversation() {
     
     // Clear highlight after a moment
     setTimeout(() => setHighlightedMessageId(null), 3000);
+  };
+
+  const checkForUserDecline = (message: string) => {
+    if (!isSessionActive) return;
+    
+    const lowerMessage = message.toLowerCase().trim();
+    const declinePhases = [
+      'no, i\'m good',
+      'no thanks',
+      'i\'m done',
+      'that\'s enough',
+      'stop',
+      'end session',
+      'i don\'t want to run it again',
+      'no more',
+      'i\'m finished',
+      'that\'s all'
+    ];
+    
+    const isDecline = declinePhases.some(phrase => lowerMessage.includes(phrase));
+    
+    if (isDecline) {
+      console.log('🛑 USER_DECLINE_DETECTED', { message: lowerMessage });
+      
+      // Allow brief response time then end
+      setTimeout(() => {
+        if (isSessionActive) { // Check if still active
+          endCurrentAttempt();
+        }
+      }, 2000); // 2 second delay to allow final agent response
+    }
   };
 
   const calculateDuration = () => {
@@ -348,6 +694,9 @@ export function Conversation() {
       text,
       sessionId 
     });
+    
+    // Check for user decline in mock inputs too
+    checkForUserDecline(text);
     
     // No live coaching during conversation
     
@@ -441,7 +790,7 @@ export function Conversation() {
               </div>
               
               {/* Key moments toggle - only shown after debrief */}
-              {session?.debriefComplete && session.keyMoments.length > 0 && (
+              {currentAttempt?.debriefComplete && currentAttempt.keyMoments.length > 0 && (
                 <div className="hidden md:block">
                   <Button
                     onClick={() => setShowKeyMoments(!showKeyMoments)}
@@ -450,12 +799,13 @@ export function Conversation() {
                     className="flex items-center gap-2"
                   >
                     <Play className="w-4 h-4" />
-                    {session.keyMoments.length} key moments
+                    {currentAttempt.keyMoments.length} key moments
                   </Button>
                 </div>
               )}
               
-              {isSessionActive ? (
+              {/* Always show End Call button for active or ending attempts */}
+              {currentAttempt && (currentAttempt.status === 'active' || currentAttempt.status === 'ending') ? (
                 <Button
                   onClick={handleEndConversation}
                   variant="destructive"
@@ -463,9 +813,9 @@ export function Conversation() {
                   className="flex items-center gap-2"
                 >
                   <PhoneOff className="w-4 h-4" />
-                  End
+                  End call
                 </Button>
-              ) : session?.status === 'completed' ? (
+              ) : currentAttempt?.status === 'complete' ? (
                 <div className="text-right">
                   <div className="text-sm text-muted-foreground">
                     Duration: {calculateDuration()}
@@ -535,8 +885,8 @@ export function Conversation() {
                     </div>
                     
                     {/* Post-debrief annotation for user messages */}
-                    {message.role === 'user' && message.hasAnnotation && session?.debriefComplete && (() => {
-                      const annotation = session.annotations.find(a => a.messageId === message.id);
+                    {message.role === 'user' && message.hasAnnotation && currentAttempt?.debriefComplete && (() => {
+                      const annotation = currentAttempt.annotations.find(a => a.messageId === message.id);
                       return annotation ? (
                         <motion.div
                           initial={{ opacity: 0, y: 5 }}
@@ -561,10 +911,17 @@ export function Conversation() {
           </div>
 
           {/* Post-debrief completion state */}
-          {session?.status === 'completed' && (
+          {currentAttempt?.status === 'complete' && (
             <div className="border-t border-border bg-slate-50 p-6">
               <div className="max-w-md mx-auto text-center">
-                {!session.debriefComplete ? (
+                {isGeneratingFeedback ? (
+                  <div className="flex items-center justify-center gap-2 mb-4">
+                    <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                      <Mic className="w-3 h-3 text-white animate-pulse" />
+                    </div>
+                    <h3 className="text-lg font-medium">Analyzing your delivery...</h3>
+                  </div>
+                ) : !currentAttempt.debriefComplete ? (
                   <div className="flex items-center justify-center gap-2 mb-4">
                     <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
                       <span className="text-white text-sm">⏱</span>
@@ -577,16 +934,18 @@ export function Conversation() {
                       <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
                         <span className="text-white text-sm">✓</span>
                       </div>
-                      <h3 className="text-lg font-medium">Rehearsal Complete</h3>
+                      <h3 className="text-lg font-medium">
+                        Attempt {currentAttempt.attemptNumber} Complete
+                      </h3>
                     </div>
                     
-                    {session.keyMoments.length > 0 && (
+                    {currentAttempt.keyMoments.length > 0 && (
                       <div className="mb-6">
                         <p className="text-sm text-slate-600 mb-3">
-                          {session.keyMoments.length} key moments from this rehearsal
+                          {currentAttempt.keyMoments.length} key moments from this rehearsal
                         </p>
                         <div className="space-y-2">
-                          {session.keyMoments.map((moment) => (
+                          {currentAttempt.keyMoments.map((moment) => (
                             <button
                               key={moment.id}
                               onClick={() => handleScrollToMoment(moment.messageId)}
@@ -601,17 +960,28 @@ export function Conversation() {
                     )}
                     
                     <div className="flex flex-col gap-3">
+                      {currentAttempt.feedbackReport && (
+                        <Button
+                          onClick={handleViewDebrief}
+                          variant="default"
+                          size="sm"
+                          className="w-full bg-purple-600 hover:bg-purple-700"
+                        >
+                          View Feedback Report
+                        </Button>
+                      )}
+                      
                       <Button
                         onClick={handleRunItAgain}
-                        variant="default"
+                        variant={currentAttempt.feedbackReport ? "outline" : "default"}
                         size="sm"
-                        className="w-full bg-blue-600 hover:bg-blue-700"
+                        className={currentAttempt.feedbackReport ? "w-full" : "w-full bg-blue-600 hover:bg-blue-700"}
                       >
                         Run it again
                       </Button>
                       
                       <div className="flex gap-3">
-                        {session.keyMoments.length > 0 && (
+                        {currentAttempt.keyMoments.length > 0 && (
                           <Button
                             onClick={() => setShowKeyMoments(!showKeyMoments)}
                             variant="outline"
@@ -669,14 +1039,32 @@ export function Conversation() {
                 </Button>
                 {/* Dev-only test for annotations */}
                 {import.meta.env.DEV && (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={generateAnnotations}
-                    className="bg-purple-600 hover:bg-purple-700 text-white"
-                  >
-                    🧪 Test Annotations
-                  </Button>
+                  <>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={generateAnnotations}
+                      className="bg-purple-600 hover:bg-purple-700 text-white"
+                    >
+                      🧪 Test Annotations
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => generateFeedbackReport(null)}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      🧪 Test Feedback
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => checkForUserDecline("No, I'm good")}
+                      className="bg-red-600 hover:bg-red-700 text-white"
+                    >
+                      🧪 Test Decline
+                    </Button>
+                  </>
                 )}
               </div>
             </div>

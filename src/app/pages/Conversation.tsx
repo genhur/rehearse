@@ -4,7 +4,7 @@ import { useNavigate, useParams, useOutletContext } from 'react-router';
 import { Button } from '../components/Button';
 import { AppHeader } from '../components/AppHeader';
 import { FeedbackRail } from '../components/FeedbackRail';
-import { getSession, updateSession, sessionManager, getCurrentAttempt, getSetupConversation, updateSetupConversation, commitSetupToSession, type RehearsalSession, type RehearsalAttempt, type SetupConversation, type TranscriptTurn, type AudioAnalysis, type FeedbackReport } from '../../../lib/sessions';
+import { getSession, updateSession, sessionManager, getCurrentAttempt, getSetupConversation, updateSetupConversation, commitSetupToSession, endCurrentAttempt as endSessionAttempt, type RehearsalSession, type RehearsalAttempt, type SetupConversation, type TranscriptTurn, type AudioAnalysis, type FeedbackReport } from '../../../lib/sessions';
 import { SimpleVoiceOrb } from '../components/SimpleVoiceOrb';
 import { Conversation as ElevenLabsConversation } from '@11labs/client';
 import type { Mode, Status } from '@11labs/client';
@@ -38,6 +38,7 @@ export function Conversation() {
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const conversationRef = useRef<ElevenLabsConversation | null>(null);
+  const inactivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Helper to determine if a call is currently active
   const isCallActive = (): boolean => {
@@ -45,7 +46,7 @@ export function Conversation() {
     if (setupConversation) return false;
     
     const currentAttemptData = getCurrentAttempt(session);
-    return session?.status === 'active' && 
+    return session?.status === 'active' || 
            currentAttemptData?.status === 'active';
   };
 
@@ -126,11 +127,21 @@ export function Conversation() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [transcript]);
 
+  useEffect(() => {
+    // Cleanup timeout on unmount
+    return () => {
+      clearInactivityTimeout();
+    };
+  }, []);
+
   const handleStartConversation = async () => {
     if (!sessionId) return;
     
     setIsSessionActive(true);
     setConversationState('listening');
+    
+    // Start inactivity timeout
+    startInactivityTimeout();
     
     // Start audio recording
     const recordingStarted = await audioRecordingService.startRecording();
@@ -160,6 +171,9 @@ export function Conversation() {
           setConversationState(mode === 'listening' ? 'listening' : mode === 'speaking' ? 'speaking' : 'thinking');
         },
         onMessage: ({ message, source }) => {
+          // Reset inactivity timeout on any message
+          startInactivityTimeout();
+          
           // Add transcript turn to session storage
           const speaker = source === 'user' ? 'user' : 'agent';
           const newTurn = sessionManager.addTranscriptTurn(sessionId, speaker, message);
@@ -174,6 +188,11 @@ export function Conversation() {
           // Check for user decline phrases
           if (speaker === 'user') {
             checkForUserDecline(message);
+          }
+          
+          // Check for natural conversation endings from assistant
+          if (speaker === 'agent') {
+            checkForNaturalEnding(message);
           }
           
           // No live coaching during active conversation
@@ -597,6 +616,9 @@ export function Conversation() {
     
     console.log('🔚 ENDING_CURRENT_ATTEMPT', { sessionId });
     
+    // Clear inactivity timeout
+    clearInactivityTimeout();
+    
     // End ElevenLabs conversation
     if (conversationRef.current) {
       await conversationRef.current.endSession();
@@ -738,6 +760,65 @@ export function Conversation() {
     }
   };
 
+  const checkForNaturalEnding = (message: string) => {
+    if (!isSessionActive) return;
+    
+    const lowerMessage = message.toLowerCase().trim();
+    const naturalEndingPhrases = [
+      'take care, and good luck with the real conversation',
+      'good luck with the actual conversation',
+      'i hope this practice helps with the real conversation',
+      'best of luck when you have the real conversation',
+      'hope this helps you feel more prepared',
+      'you seem ready for the real conversation',
+      'i think you\'re well-prepared now',
+      'this should help you feel more confident',
+      'you\'ve got this',
+      'i believe you\'re ready',
+      'feel free to practice again',
+      'let me know if you want to practice more',
+      'would you like to run through this again',
+      'shall we wrap up here'
+    ];
+    
+    const isNaturalEnding = naturalEndingPhrases.some(phrase => 
+      lowerMessage.includes(phrase)
+    );
+    
+    if (isNaturalEnding) {
+      console.log('🏁 NATURAL_ENDING_DETECTED', { message: lowerMessage });
+      
+      // Allow a brief moment for user to read the message, then end
+      setTimeout(() => {
+        if (isSessionActive) { // Check if still active
+          endCurrentAttempt();
+        }
+      }, 3000); // 3 second delay to let user read the ending message
+    }
+  };
+
+  const startInactivityTimeout = () => {
+    // Clear any existing timeout
+    if (inactivityTimeoutRef.current) {
+      clearTimeout(inactivityTimeoutRef.current);
+    }
+    
+    // Start a new timeout (5 minutes of inactivity)
+    inactivityTimeoutRef.current = setTimeout(() => {
+      if (isSessionActive) {
+        console.log('⏰ CONVERSATION_TIMEOUT_REACHED');
+        endCurrentAttempt();
+      }
+    }, 5 * 60 * 1000); // 5 minutes
+  };
+
+  const clearInactivityTimeout = () => {
+    if (inactivityTimeoutRef.current) {
+      clearTimeout(inactivityTimeoutRef.current);
+      inactivityTimeoutRef.current = null;
+    }
+  };
+
   const calculateDuration = () => {
     if (!session || transcript.length === 0) return '0s';
     
@@ -771,6 +852,11 @@ export function Conversation() {
   };
 
   const handleMockUserInput = (text: string) => {
+    // Reset inactivity timeout on any message
+    if (isSessionActive) {
+      startInactivityTimeout();
+    }
+    
     let userTurn;
     
     // Handle setup conversations vs regular sessions
@@ -826,6 +912,11 @@ export function Conversation() {
       
       const response = responses[Math.floor(Math.random() * responses.length)];
       
+      // Reset inactivity timeout for AI responses too
+      if (isSessionActive) {
+        startInactivityTimeout();
+      }
+      
       // Handle setup conversations vs regular sessions
       if (setupConversation && setupId) {
         const aiTurn = sessionManager.addSetupTranscriptTurn(setupId, 'agent', response);
@@ -842,6 +933,9 @@ export function Conversation() {
       } else if (sessionId) {
         const aiTurn = sessionManager.addTranscriptTurn(sessionId, 'agent', response);
         setTranscript(prev => [...prev, aiTurn]);
+        
+        // Check for natural ending in mock responses too
+        checkForNaturalEnding(response);
       }
       
       setConversationState('listening');

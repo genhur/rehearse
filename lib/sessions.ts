@@ -489,3 +489,8 @@ export const createSetupConversation = (scenarioDraft: string) => sessionManager
 export const getSetupConversation = (id: string) => sessionManager.getSetupConversation(id);
 export const updateSetupConversation = (setup: SetupConversation) => sessionManager.updateSetupConversation(setup);
 export const commitSetupToSession = (setupId: string) => sessionManager.commitSetupToSession(setupId);
+
+// Centralized session ending function
+export const endCurrentAttempt = (sessionId: string, feedbackReport?: FeedbackReport, audioAnalysis?: AudioAnalysis) => {
+  sessionManager.completeAttempt(sessionId, feedbackReport, audioAnalysis);
+};

@@ -841,39 +841,250 @@ export function Conversation() {
     }
   };
 
-  const generateFallbackFeedbackReport = (): any => {
+  const hasInsufficientData = (transcript: any[]): boolean => {
     const userTurns = transcript.filter(turn => turn.speaker === 'user');
-    const sampleUserText = userTurns.length > 0 ? userTurns[0].text : "I understand your concern.";
+    const totalUserWords = userTurns.reduce((count, turn) => {
+      return count + turn.text.split(/\s+/).filter(word => word.length > 0).length;
+    }, 0);
     
-    console.log('🔍 FALLBACK_FEEDBACK_AUDIT', {
-      transcriptLength: transcript.length,
+    console.log('🔍 DATA_SUFFICIENCY_CHECK', {
       userTurnCount: userTurns.length,
-      transcript: transcript.map(t => ({ id: t.id, speaker: t.speaker, text: t.text })),
-      sampleUserText
+      totalUserWords,
+      meetsMinimumTurns: userTurns.length >= 3,
+      meetsMinimumWords: totalUserWords >= 100
     });
     
+    return userTurns.length < 3 || totalUserWords < 100;
+  };
+
+  const generateEvidenceBasedFeedback = (): any => {
+    const userTurns = transcript.filter(turn => turn.speaker === 'user');
+    
+    console.log('🔍 EVIDENCE_BASED_FEEDBACK_GENERATION', {
+      transcriptLength: transcript.length,
+      userTurnCount: userTurns.length,
+      transcript: transcript.map(t => ({ id: t.id, speaker: t.speaker, text: t.text }))
+    });
+    
+    // Check for insufficient data
+    if (hasInsufficientData(transcript)) {
+      return {
+        overallAssessment: "Not enough conversation data to generate meaningful coaching feedback. Continue the simulation or try another rehearsal.",
+        howYouCameAcross: "Insufficient conversation data for analysis.",
+        whatWorked: [],
+        opportunities: ["Have a longer conversation to enable coaching feedback"],
+        replayMoment: {
+          turnId: null,
+          originalMoment: "No sufficient user participation to analyze.",
+          howYouLikelySounded: "Unable to analyze - insufficient data.",
+          howItMayHaveLanded: "Unable to analyze - insufficient data.",
+          strongerVersion: "Continue the conversation to get meaningful feedback.",
+          deliveryTip: "Practice more to generate evidence-based coaching."
+        }
+      };
+    }
+    
+    // Generate evidence-based feedback for sufficient data
+    const strengths = analyzeStrengths(userTurns, transcript);
+    const opportunities = analyzeOpportunities(userTurns, transcript);
+    const assessment = generateEvidenceBasedAssessment(userTurns, transcript);
+    const howYouCameAcross = analyzeHowYouCameAcross(userTurns, transcript);
+    const replayMoment = identifyReplayMoment(userTurns, transcript);
+    
     return {
-      overallAssessment: "This was a practice conversation to help you prepare for the real thing. You engaged with the scenario and practiced important communication skills.",
-      howYouCameAcross: "You participated actively in the conversation practice and showed willingness to engage with challenging topics.",
-      whatWorked: [
-        "You engaged with the conversation scenario",
-        "You practiced important communication skills",
-        "You stayed focused on the conversation topic"
-      ],
-      opportunities: [
-        "Consider practicing different response approaches",
-        "Think about your tone and delivery",
-        "Focus on building on your communication strengths"
-      ],
-      replayMoment: {
-        turnId: userTurns.length > 0 ? userTurns[0].id : null,
-        originalMoment: sampleUserText,
-        howYouLikelySounded: "This came across as thoughtful and engaged.",
-        howItMayHaveLanded: "Your response likely came across as genuine and considerate.",
-        strongerVersion: sampleUserText + " Could you tell me more about that?",
-        deliveryTip: "Consider adding follow-up questions to show deeper engagement."
+      overallAssessment: assessment.text,
+      howYouCameAcross: howYouCameAcross.text,
+      whatWorked: strengths.map(s => s.claim),
+      opportunities: opportunities.map(o => o.claim),
+      replayMoment,
+      // Developer validation mode
+      _validation: {
+        assessment: { claim: assessment.text, supportingMessages: assessment.evidence },
+        howYouCameAcross: { claim: howYouCameAcross.text, supportingMessages: howYouCameAcross.evidence },
+        strengths: strengths,
+        opportunities: opportunities
       }
     };
+  };
+
+  const analyzeStrengths = (userTurns: any[], fullTranscript: any[]) => {
+    const strengths = [];
+    
+    // Look for evidence of specific positive behaviors
+    for (const turn of userTurns) {
+      const text = turn.text.toLowerCase();
+      
+      // Evidence: Direct acknowledgment
+      if (text.includes('i understand') || text.includes('i see') || text.includes('that makes sense')) {
+        strengths.push({
+          claim: `You acknowledged their perspective when you said "${turn.text.substring(0, 50)}..."`,
+          supportingMessages: [turn.id],
+          evidence: turn.text
+        });
+      }
+      
+      // Evidence: Asking clarifying questions  
+      if (text.includes('what') && text.includes('?') || text.includes('how') && text.includes('?')) {
+        strengths.push({
+          claim: `You asked clarifying questions, showing engagement: "${turn.text}"`,
+          supportingMessages: [turn.id],
+          evidence: turn.text
+        });
+      }
+      
+      // Evidence: Taking ownership
+      if (text.includes('my mistake') || text.includes('i should have') || text.includes('i was wrong')) {
+        strengths.push({
+          claim: `You took ownership of the issue: "${turn.text}"`,
+          supportingMessages: [turn.id],
+          evidence: turn.text
+        });
+      }
+      
+      // Evidence: Proposing solutions
+      if (text.includes('we could') || text.includes('what if') || text.includes('let\'s')) {
+        strengths.push({
+          claim: `You proposed collaborative solutions: "${turn.text}"`,
+          supportingMessages: [turn.id], 
+          evidence: turn.text
+        });
+      }
+    }
+    
+    // Return max 3 strengths with strongest evidence
+    return strengths.slice(0, 3);
+  };
+
+  const analyzeOpportunities = (userTurns: any[], fullTranscript: any[]) => {
+    const opportunities = [];
+    
+    for (const turn of userTurns) {
+      const text = turn.text.toLowerCase();
+      
+      // Evidence: Defensive language
+      if (text.includes('but') || text.includes('however') || text.includes('actually')) {
+        opportunities.push({
+          claim: `Consider removing defensive language. Instead of "${turn.text.substring(0, 30)}...", try a more collaborative approach.`,
+          supportingMessages: [turn.id],
+          evidence: turn.text
+        });
+      }
+      
+      // Evidence: Vague responses
+      if (text.includes('maybe') || text.includes('i think') || text.includes('probably') || text.includes('sort of')) {
+        opportunities.push({
+          claim: `Replace uncertain language with confident statements. Your response "${turn.text}" could be more definitive.`,
+          supportingMessages: [turn.id],
+          evidence: turn.text
+        });
+      }
+      
+      // Evidence: Very short responses (less than 5 words)
+      if (turn.text.split(' ').length < 5) {
+        opportunities.push({
+          claim: `Expand on your thoughts. Your brief response "${turn.text}" could include more detail or reasoning.`,
+          supportingMessages: [turn.id],
+          evidence: turn.text
+        });
+      }
+    }
+    
+    return opportunities.slice(0, 3);
+  };
+
+  const generateEvidenceBasedAssessment = (userTurns: any[], fullTranscript: any[]) => {
+    const userResponseCount = userTurns.length;
+    const avgResponseLength = userTurns.reduce((sum, turn) => sum + turn.text.length, 0) / userTurns.length;
+    const totalWords = userTurns.reduce((count, turn) => count + turn.text.split(/\s+/).length, 0);
+    
+    let assessment = `You participated in ${userResponseCount} exchanges with an average response length of ${Math.round(avgResponseLength)} characters (${totalWords} total words). `;
+    
+    // Add specific evidence-based observations
+    const hasQuestions = userTurns.some(turn => turn.text.includes('?'));
+    const hasOwnership = userTurns.some(turn => 
+      turn.text.toLowerCase().includes('my mistake') || 
+      turn.text.toLowerCase().includes('i should have'));
+    
+    if (hasQuestions) {
+      assessment += "You asked questions to gather information. ";
+    }
+    
+    if (hasOwnership) {
+      assessment += "You demonstrated accountability by taking ownership. ";
+    }
+    
+    return {
+      text: assessment,
+      evidence: userTurns.map(turn => turn.id)
+    };
+  };
+
+  const analyzeHowYouCameAcross = (userTurns: any[], fullTranscript: any[]) => {
+    // Analyze tone and delivery based on word choice and structure
+    const allText = userTurns.map(turn => turn.text.toLowerCase()).join(' ');
+    
+    let tone = "measured";
+    const evidence = [];
+    
+    if (allText.includes('sorry') || allText.includes('apologize')) {
+      tone = "apologetic and accommodating";
+      evidence.push(...userTurns.filter(turn => 
+        turn.text.toLowerCase().includes('sorry') || 
+        turn.text.toLowerCase().includes('apologize')).map(turn => turn.id));
+    } else if (allText.includes('definitely') || allText.includes('absolutely') || allText.includes('certainly')) {
+      tone = "confident and direct";  
+      evidence.push(...userTurns.filter(turn => 
+        turn.text.toLowerCase().includes('definitely') || 
+        turn.text.toLowerCase().includes('absolutely')).map(turn => turn.id));
+    } else if (allText.includes('maybe') || allText.includes('perhaps') || allText.includes('i think')) {
+      tone = "tentative and thoughtful";
+      evidence.push(...userTurns.filter(turn => 
+        turn.text.toLowerCase().includes('maybe') || 
+        turn.text.toLowerCase().includes('perhaps')).map(turn => turn.id));
+    }
+    
+    return {
+      text: `You likely came across as ${tone} based on your language choices.`,
+      evidence: evidence
+    };
+  };
+
+  const identifyReplayMoment = (userTurns: any[], fullTranscript: any[]) => {
+    if (userTurns.length === 0) {
+      return {
+        turnId: null,
+        originalMoment: "No user responses to analyze.",
+        howYouLikelySounded: "No audio data.",
+        howItMayHaveLanded: "No interaction occurred.",
+        strongerVersion: "Participate more in the conversation.",
+        deliveryTip: "Practice speaking up during conversations."
+      };
+    }
+    
+    // Pick the longest user response as most substantial for analysis
+    const longestResponse = userTurns.reduce((longest, current) => 
+      current.text.length > longest.text.length ? current : longest
+    );
+    
+    return {
+      turnId: longestResponse.id,
+      originalMoment: longestResponse.text,
+      howYouLikelySounded: `This response was ${longestResponse.text.length} characters and likely came across as your most substantial contribution.`,
+      howItMayHaveLanded: "This represented your main engagement with the conversation.",
+      strongerVersion: longestResponse.text + " What are your thoughts on this approach?",
+      deliveryTip: "Consider building on substantial responses like this with follow-up questions or additional detail."
+    };
+  };
+
+  const generateFallbackFeedbackReport = (): any => {
+    console.log('🔍 FALLBACK_FEEDBACK_AUDIT', {
+      transcriptLength: transcript.length,
+      userTurnCount: transcript.filter(turn => turn.speaker === 'user').length,
+      transcript: transcript.map(t => ({ id: t.id, speaker: t.speaker, text: t.text }))
+    });
+    
+    // Always use evidence-based feedback generation
+    return generateEvidenceBasedFeedback();
   };
 
   const forceCompleteCurrentConversation = () => {

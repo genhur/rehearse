@@ -43,18 +43,6 @@ export function Conversation() {
   const conversationRef = useRef<ElevenLabsConversation | null>(null);
   const inactivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Helper to determine if a call is currently active
-  const isCallActive = (): boolean => {
-    // Setup conversations are never "active calls"
-    if (setupConversation) return false;
-    
-    // Only simulation phase sessions can have active calls
-    if (session?.phase !== 'simulation') return false;
-    
-    const currentAttemptData = getCurrentAttempt(session);
-    return session?.status === 'active' || 
-           currentAttemptData?.status === 'active';
-  };
 
   useEffect(() => {
     console.log('🚀 SETUP: CONVERSATION_PAGE_MOUNTED', { sessionId, setupId });
@@ -123,7 +111,20 @@ export function Conversation() {
       currentAttempt: currentAttemptData 
     });
     
-    // Auto-start simulation phase sessions
+    // Initialize isSessionActive for simulation sessions with active status
+    if (sessionData.phase === 'simulation' && 
+        (sessionData.status === 'active' || currentAttemptData?.status === 'active')) {
+      console.log('🚀 SETUP: Setting isSessionActive=true for active simulation session');
+      setIsSessionActive(true);
+      
+      // If session has existing transcript, don't auto-start conversation
+      if (currentAttemptData?.transcript && currentAttemptData.transcript.length > 0) {
+        console.log('🚀 SETUP: Session has existing transcript, not auto-starting');
+        setConversationState('idle'); // Set to idle since conversation is not currently active
+      }
+    }
+    
+    // Auto-start simulation phase sessions that don't have transcript yet
     if (sessionData.phase === 'simulation' && 
         currentAttemptData?.status === 'active' &&
         (!currentAttemptData.transcript || currentAttemptData.transcript.length === 0)) {
@@ -1291,9 +1292,17 @@ export function Conversation() {
     return 'Conversation practice';
   };
 
+  // Extract the exact active condition used by the header
+  const shouldShowActiveStatus = isSessionActive;
+  const shouldShowEndCall = shouldShowActiveStatus && !setupConversation;
+
   const getSessionStatus = (): 'active' | 'complete' | 'idle' => {
-    if (isSessionActive) return 'active';
-    if (currentAttempt?.status === 'complete') return 'complete';
+    if (shouldShowActiveStatus) {
+      return 'active';
+    }
+    if (currentAttempt?.status === 'complete') {
+      return 'complete';
+    }
     return 'idle';
   };
 
@@ -1307,6 +1316,8 @@ export function Conversation() {
         showHomeButton={false}
         showHistoryButton={true}
         onHistoryClick={openHistoryPanel}
+        showEndCall={shouldShowEndCall}
+        onEndCall={handleEndConversation}
       />
 
       {/* Session Controls Bar */}
@@ -1329,24 +1340,13 @@ export function Conversation() {
             </div>
             
             <div className="flex items-center gap-3">
-              {/* Show End Call button for active sessions and attempts */}
-              {(isCallActive() || currentAttempt?.status === 'ending') ? (
-                <Button
-                  onClick={handleEndConversation}
-                  variant="destructive"
-                  size="sm"
-                  className="flex items-center gap-2"
-                >
-                  <PhoneOff className="w-4 h-4" />
-                  End call
-                </Button>
-              ) : currentAttempt?.status === 'complete' ? (
+              {currentAttempt?.status === 'complete' && (
                 <div className="text-right">
                   <div className="text-xs text-muted-foreground">
                     Duration: {calculateDuration()} · {transcript.length} messages
                   </div>
                 </div>
-              ) : null}
+              )}
             </div>
           </div>
         </div>

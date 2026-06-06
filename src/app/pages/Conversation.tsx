@@ -1007,18 +1007,37 @@ export function Conversation() {
       params
     });
     
-    // Always try to complete conversation first
-    // Only navigate home if completion fails and we have no valid session
-    console.log("END_CALL: Attempting to complete conversation");
+    // If this is a setup conversation with content, convert it to a session first
+    if (setupConversation && setupId && !sessionId && !session && transcript.length > 0) {
+      console.log("END_CALL: Converting setup to session then completing");
+      try {
+        const newSession = commitSetupToSession(setupId);
+        console.log("END_CALL: Session created from setup:", newSession.id);
+        
+        // Update local state with the new session
+        setSession(newSession);
+        const newAttempt = getCurrentAttempt(newSession);
+        setCurrentAttempt(newAttempt);
+        
+        // Now complete the converted session
+        forceCompleteCurrentConversation();
+        return;
+      } catch (error) {
+        console.error("END_CALL: Failed to convert setup to session:", error);
+      }
+    }
     
-    if (!sessionId && !session) {
-      console.log("END_CALL: No session to complete, navigating home");
-      console.trace('NAVIGATE_HOME_CALLED: No session in handleEndConversation');
-      navigate('/');
+    // Handle regular sessions
+    if (sessionId && session) {
+      console.log("END_CALL: Completing existing session");
+      forceCompleteCurrentConversation();
       return;
     }
     
-    forceCompleteCurrentConversation();
+    // No session and no convertible setup - navigate home
+    console.log("END_CALL: No session to complete, navigating home");
+    console.trace('NAVIGATE_HOME_CALLED: No session in handleEndConversation');
+    navigate('/');
   };
 
   const handleViewFeedback = () => {

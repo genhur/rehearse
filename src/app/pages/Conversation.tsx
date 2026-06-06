@@ -51,6 +51,7 @@ export function Conversation() {
     if (setupId) {
       const setupData = getSetupConversation(setupId);
       if (!setupData) {
+        console.trace('NAVIGATE_HOME_CALLED: Setup conversation not found');
         navigate('/');
         return;
       }
@@ -82,6 +83,7 @@ export function Conversation() {
     // Handle regular session
     if (!sessionId) {
       console.log('🚀 SETUP: No sessionId, redirecting to home');
+      console.trace('NAVIGATE_HOME_CALLED: No sessionId in useEffect');
       navigate('/');
       return;
     }
@@ -96,6 +98,7 @@ export function Conversation() {
         console.log('🚀 SETUP: In conversation page, not navigating away');
         return;
       }
+      console.trace('NAVIGATE_HOME_CALLED: Session not found in useEffect');
       navigate('/');
       return;
     }
@@ -893,12 +896,14 @@ export function Conversation() {
     // Force complete the session state
     const now = new Date().toISOString();
     
+    console.trace('SESSION_MARKED_COMPLETE: Updating session status to complete');
     const updatedSession = {
       ...session,
       status: 'complete' as const,
       phase: 'complete' as const
     };
     
+    console.trace('ATTEMPT_MARKED_COMPLETE: Updating attempt status to complete');
     const updatedAttempt = currentAttempt ? {
       ...currentAttempt,
       status: 'complete' as const,
@@ -916,6 +921,7 @@ export function Conversation() {
     
     // Persist to localStorage
     try {
+      console.trace('CALLING_endSessionAttempt: Persisting session completion');
       endSessionAttempt(sessionId);
     } catch (error) {
       console.log('Session persistence failed, updating local state anyway:', error);
@@ -1007,6 +1013,7 @@ export function Conversation() {
     
     if (!sessionId && !session) {
       console.log("END_CALL: No session to complete, navigating home");
+      console.trace('NAVIGATE_HOME_CALLED: No session in handleEndConversation');
       navigate('/');
       return;
     }
@@ -1063,6 +1070,7 @@ export function Conversation() {
   };
 
   const handleBackHome = () => {
+    console.trace('NAVIGATE_HOME_CALLED: handleBackHome');
     navigate('/');
   };
 
@@ -1401,7 +1409,10 @@ export function Conversation() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <p className="text-muted-foreground mb-4">Session not found</p>
-          <Button onClick={() => navigate('/')}>Back home</Button>
+          <Button onClick={() => { 
+            console.trace('NAVIGATE_HOME_CALLED: Back home button'); 
+            navigate('/'); 
+          }}>Back home</Button>
         </div>
       </div>
     );

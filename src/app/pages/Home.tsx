@@ -1,71 +1,73 @@
 import { motion } from 'motion/react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useOutletContext } from 'react-router';
 import { VoiceOrb } from '../components/VoiceOrb';
-import { sessionStorage } from '../../../lib/session';
+import { AppHeader } from '../components/AppHeader';
+import { createSetupConversation } from '../../../lib/sessions';
+
+interface OutletContext {
+  openHistoryPanel: () => void;
+  isHistoryPanelOpen: boolean;
+}
 
 const examples = [
-  "I need to tell my cofounder a major deal fell through.",
-  "I need to end a relationship without hurting them.",
-  "I need to ask for a raise.",
+  "I need to tell my cofounder the deal fell through and runway is tight.",
+  "I need to tell my partner I don't think we should keep dating.",
 ];
 
 export function Home() {
   const navigate = useNavigate();
+  const { openHistoryPanel } = useOutletContext<OutletContext>();
 
   const handleExampleClick = (example: string) => {
-    navigate('/setup/custom', { state: { customScenario: example } });
+    console.log('EXAMPLE_CLICKED', example);
+    
+    // Create a setup conversation instead of a full session
+    const setupConversation = createSetupConversation(example);
+    console.log('SETUP_CREATED_FROM_EXAMPLE', setupConversation);
+    
+    // Navigate to conversation with setup ID
+    const route = `/conversation/setup/${setupConversation.id}`;
+    console.log('NAVIGATING_TO', route);
+    navigate(route);
   };
 
   const handleStartNewRehearsal = () => {
     console.log('HOME_CIRCLE_CLICKED');
     
-    // Create a new session immediately
-    const session = sessionStorage.createSession(
-      'New rehearsal',
-      '', // role will be determined during intake
-      '', // goal will be determined during intake  
-      ''  // worry will be determined during intake
+    // Create a setup conversation for intake
+    const setupConversation = createSetupConversation(
+      'What difficult conversation are you avoiding today?'
     );
+    console.log('SETUP_CREATED_HOME', setupConversation);
     
-    // Update session to intake phase
-    sessionStorage.updateSession(session.id, { phase: 'intake' });
-    console.log('SESSION_CREATED_HOME', session);
-    
-    // Navigate immediately to conversation
-    const route = `/conversation/${session.id}`;
+    // Navigate to conversation with setup ID
+    const route = `/conversation/setup/${setupConversation.id}`;
     console.log('NAVIGATING_TO_HOME', route);
     navigate(route);
   };
 
   return (
-    <div
-      className="min-h-screen bg-background flex flex-col items-center justify-center relative overflow-hidden"
-      style={{ padding: '5rem 1.5rem' }}
-    >
-      {/* Subtle ambient background glow */}
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            'radial-gradient(ellipse 60% 50% at 50% 42%, rgba(20,17,13,0.025), transparent)',
-        }}
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* App Header for Home */}
+      <AppHeader
+        showHomeButton={false}
+        showHistoryButton={true}
+        onHistoryClick={openHistoryPanel}
       />
 
-      {/* Wordmark */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 1.2, delay: 0.2 }}
-        className="fixed top-8 left-1/2 -translate-x-1/2 select-none"
-        style={{
-          fontSize: '0.65rem',
-          letterSpacing: '0.22em',
-          textTransform: 'uppercase',
-          color: 'rgba(26,22,18,0.28)',
-        }}
+      {/* Main content */}
+      <div
+        className="flex-1 flex flex-col items-center justify-center relative overflow-hidden"
+        style={{ padding: '5rem 1.5rem' }}
       >
-        Rehearse
-      </motion.div>
+        {/* Subtle ambient background glow */}
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              'radial-gradient(ellipse 60% 50% at 50% 42%, rgba(20,17,13,0.025), transparent)',
+          }}
+        />
 
       <div className="max-w-[480px] w-full flex flex-col items-center relative z-10">
 
@@ -150,6 +152,7 @@ export function Home() {
           ))}
         </motion.div>
       </div>
+    </div>
     </div>
   );
 }

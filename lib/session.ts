@@ -10,7 +10,63 @@ export interface Message {
     valence: number;
     arousal: number;
   };
-  hasCoachNote?: boolean;
+  hasAnnotation?: boolean;
+}
+
+export interface Annotation {
+  id: string;
+  messageId: string;
+  sessionId: string;
+  title: string;
+  body: string;
+  type: 'vague_answer' | 'strong_ownership' | 'avoided_question' | 'stayed_calm' | 
+        'missed_acknowledgment' | 'clear_ask' | 'good_boundary' | 'strong_moment' | 
+        'premature_problem_solving' | 'acknowledged_concern';
+  createdAt: number;
+}
+
+export interface KeyMoment {
+  id: string;
+  annotationId: string;
+  messageId: string;
+  label: string;
+  summary: string;
+}
+
+export interface AudioAnalysis {
+  primaryEmotion: string;
+  confidence: number;
+  rawResult: unknown;
+}
+
+export interface FeedbackReport {
+  overallAssessment: string;
+  howYouCameAcross: string;
+  whatWorked: string[];
+  opportunities: string[];
+  replayMoment: {
+    originalMoment: string;
+    howYouLikelySounded: string;
+    howItMayHaveLanded: string;
+    strongerVersion: string;
+    deliveryTip: string;
+  };
+}
+
+export interface RehearsalAttempt {
+  id: string;
+  sessionId: string;
+  attemptNumber: number;
+  status: 'active' | 'ending' | 'complete';
+  startedAt: number;
+  endedAt?: number;
+  messages: Message[];
+  annotations: Annotation[];
+  keyMoments: KeyMoment[];
+  debriefComplete: boolean;
+  audioRecording?: Blob;
+  audioAnalysis?: AudioAnalysis;
+  feedbackReport?: FeedbackReport;
 }
 
 export interface Session {
@@ -22,7 +78,8 @@ export interface Session {
   createdAt: number;
   status: 'active' | 'completed';
   phase: 'intake' | 'roleplay';
-  messages: Message[];
+  currentAttemptId: string;
+  attempts: RehearsalAttempt[];
 }
 
 class SessionStorage {
@@ -57,21 +114,90 @@ class SessionStorage {
   }
 
   createSession(scenario: string, role: string, goal: string, worry: string): Session {
+    const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const firstAttemptId = `attempt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    const firstAttempt: RehearsalAttempt = {
+      id: firstAttemptId,
+      sessionId,
+      attemptNumber: 1,
+      status: 'active',
+      startedAt: Date.now(),
+      messages: [],
+      annotations: [],
+      keyMoments: [],
+      debriefComplete: false
+    };
+
     const session: Session = {
-      id: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      id: sessionId,
       scenario,
       role,
       goal,
       worry,
       createdAt: Date.now(),
       status: 'active',
-      phase: 'roleplay', // default phase
-      messages: []
+      phase: 'roleplay',
+      currentAttemptId: firstAttemptId,
+      attempts: [firstAttempt]
     };
 
     this.sessions.set(session.id, session);
     this.saveToStorage();
     return session;
+  }
+
+  createNewAttempt(sessionId: string): RehearsalAttempt | null {
+    const session = this.sessions.get(sessionId);
+    if (!session) return null;
+
+    const attemptNumber = session.attempts.length + 1;
+    const attemptId = `attempt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    const newAttempt: RehearsalAttempt = {
+      id: attemptId,
+      sessionId,
+      attemptNumber,
+      status: 'active',
+      startedAt: Date.now(),
+      messages: [],
+      annotations: [],
+      keyMoments: [],
+      debriefComplete: false
+    };
+
+    // Mark previous attempt as complete
+    const currentAttempt = this.getCurrentAttempt(sessionId);
+    if (currentAttempt) {
+      currentAttempt.status = 'complete';
+      currentAttempt.endedAt = Date.now();
+    }
+
+    session.attempts.push(newAttempt);
+    session.currentAttemptId = attemptId;
+    session.status = 'active';
+    
+    this.saveToStorage();
+    return newAttempt;
+  }
+
+  getCurrentAttempt(sessionId: string): RehearsalAttempt | null {
+    const session = this.sessions.get(sessionId);
+    if (!session) return null;
+    
+    return session.attempts.find(attempt => attempt.id === session.currentAttemptId) || null;
+  }
+
+  endCurrentAttempt(sessionId: string): void {
+    const session = this.sessions.get(sessionId);
+    const currentAttempt = this.getCurrentAttempt(sessionId);
+    
+    if (session && currentAttempt && currentAttempt.status === 'active') {
+      currentAttempt.status = 'complete';
+      currentAttempt.endedAt = Date.now();
+      session.status = 'completed';
+      this.saveToStorage();
+    }
   }
 
   getSession(id: string): Session | null {
@@ -99,9 +225,9 @@ class SessionStorage {
   }
 
   addMessage(sessionId: string, role: 'user' | 'assistant', text: string): Message {
-    const session = this.sessions.get(sessionId);
-    if (!session) {
-      throw new Error(`Session ${sessionId} not found`);
+    const currentAttempt = this.getCurrentAttempt(sessionId);
+    if (!currentAttempt) {
+      throw new Error(`No active attempt found for session ${sessionId}`);
     }
 
     const message: Message = {
@@ -112,14 +238,69 @@ class SessionStorage {
       timestamp: Date.now()
     };
 
-    session.messages.push(message);
+    currentAttempt.messages.push(message);
     this.saveToStorage();
     return message;
   }
 
   getMessages(sessionId: string): Message[] {
-    const session = this.sessions.get(sessionId);
-    return session ? session.messages : [];
+    const currentAttempt = this.getCurrentAttempt(sessionId);
+    return currentAttempt ? currentAttempt.messages : [];
+  }
+
+  addAnnotation(sessionId: string, messageId: string, title: string, body: string, type: Annotation['type']): Annotation {
+    const currentAttempt = this.getCurrentAttempt(sessionId);
+    if (!currentAttempt) {
+      throw new Error(`No active attempt found for session ${sessionId}`);
+    }
+
+    const annotation: Annotation = {
+      id: `annotation_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      messageId,
+      sessionId,
+      title,
+      body,
+      type,
+      createdAt: Date.now()
+    };
+
+    currentAttempt.annotations.push(annotation);
+    
+    // Mark message as having annotation
+    const message = currentAttempt.messages.find(m => m.id === messageId);
+    if (message) {
+      message.hasAnnotation = true;
+    }
+    
+    this.saveToStorage();
+    return annotation;
+  }
+
+  addKeyMoment(sessionId: string, annotationId: string, messageId: string, label: string, summary: string): KeyMoment {
+    const currentAttempt = this.getCurrentAttempt(sessionId);
+    if (!currentAttempt) {
+      throw new Error(`No active attempt found for session ${sessionId}`);
+    }
+
+    const keyMoment: KeyMoment = {
+      id: `moment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      annotationId,
+      messageId,
+      label,
+      summary
+    };
+
+    currentAttempt.keyMoments.push(keyMoment);
+    this.saveToStorage();
+    return keyMoment;
+  }
+
+  markDebriefComplete(sessionId: string): void {
+    const currentAttempt = this.getCurrentAttempt(sessionId);
+    if (currentAttempt) {
+      currentAttempt.debriefComplete = true;
+      this.saveToStorage();
+    }
   }
 }
 

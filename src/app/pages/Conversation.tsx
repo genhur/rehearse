@@ -981,6 +981,15 @@ export function Conversation() {
 
   const handleEndConversation = () => {
     console.log("END_CALL_CLICKED");
+    
+    // Handle setup conversations - navigate away instead of completing
+    if (setupConversation && !sessionId) {
+      console.log("END_CALL: Setup conversation, navigating home");
+      navigate('/');
+      return;
+    }
+    
+    // Handle regular sessions
     forceCompleteCurrentConversation();
   };
 
@@ -1429,7 +1438,9 @@ export function Conversation() {
 
   // Extract the exact active condition used by the header
   const shouldShowActiveStatus = isSessionActive;
-  const shouldShowEndCall = shouldShowActiveStatus;
+  
+  // Show End Call button if there's any active session or setup conversation
+  const shouldShowEndCall = isSessionActive || Boolean(setupConversation) || Boolean(session);
   
   // Debug logging
   console.log("Conversation render: isSessionActive =", isSessionActive);

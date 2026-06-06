@@ -103,6 +103,22 @@ export function Conversation() {
     const currentAttemptData = getCurrentAttempt(sessionData);
     setCurrentAttempt(currentAttemptData);
     setTranscript(currentAttemptData ? currentAttemptData.transcript : []);
+    
+    // Add initial intake message if this is a new session with no transcript
+    if (sessionData.scenario === 'What difficult conversation are you avoiding today?' && 
+        (!currentAttemptData || currentAttemptData.transcript.length === 0)) {
+      const initialTurn = sessionManager.addTranscriptTurn(
+        sessionId,
+        'agent',
+        'What conversation do you need to rehearse?'
+      );
+      setTranscript([initialTurn]);
+      
+      // Auto-start conversation immediately
+      setTimeout(() => {
+        handleStartConversation();
+      }, 500);
+    }
   }, [sessionId, setupId, navigate]);
 
   useEffect(() => {
@@ -832,10 +848,13 @@ export function Conversation() {
     }, 1500);
   };
 
-  if (!session) {
+  if (!session && !setupConversation) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Loading conversation...</p>
+        <div className="text-center">
+          <p className="text-muted-foreground mb-4">Session not found</p>
+          <Button onClick={() => navigate('/')}>Back home</Button>
+        </div>
       </div>
     );
   }

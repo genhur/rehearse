@@ -2,7 +2,7 @@ import { motion } from 'motion/react';
 import { useNavigate, useOutletContext } from 'react-router';
 import { VoiceOrb } from '../components/VoiceOrb';
 import { AppHeader } from '../components/AppHeader';
-import { createSetupConversation } from '../../../lib/sessions';
+import { createSession, createSetupConversation } from '../../../lib/sessions';
 
 interface OutletContext {
   openHistoryPanel: () => void;
@@ -32,18 +32,13 @@ export function Home() {
   };
 
   const handleStartNewRehearsal = () => {
-    console.log('HOME_CIRCLE_CLICKED');
-    
-    // Create a setup conversation for intake
-    const setupConversation = createSetupConversation(
+    // Create a real committed session for immediate roleplay
+    const session = createSession(
       'What difficult conversation are you avoiding today?'
     );
-    console.log('SETUP_CREATED_HOME', setupConversation);
     
-    // Navigate to conversation with setup ID
-    const route = `/conversation/setup/${setupConversation.id}`;
-    console.log('NAVIGATING_TO_HOME', route);
-    navigate(route);
+    // Navigate to the committed session
+    navigate(`/conversation/${session.id}`);
   };
 
   return (

@@ -91,6 +91,11 @@ export function Conversation() {
     const sessionData = getSession(sessionId);
     if (!sessionData) {
       console.error('🚀 SETUP: Session not found, redirecting to home', { sessionId });
+      // Don't navigate if we're in the middle of completion
+      if (window.location.pathname.includes('/conversation/')) {
+        console.log('🚀 SETUP: In conversation page, not navigating away');
+        return;
+      }
       navigate('/');
       return;
     }
@@ -847,6 +852,12 @@ export function Conversation() {
     console.trace("FORCE_COMPLETE_CALLED");
     console.log('🔚 FORCE_COMPLETE_CONVERSATION', { sessionId, session, currentAttempt });
     
+    // Add guard to prevent execution when no session
+    if (!sessionId && !session) {
+      console.log('🔚 FORCE_COMPLETE: No session to complete, returning early');
+      return;
+    }
+    
     // Clear inactivity timeout
     clearInactivityTimeout();
     
@@ -985,7 +996,9 @@ export function Conversation() {
       hasSessionId: Boolean(sessionId), 
       hasSession: Boolean(session),
       sessionPhase: session?.phase,
-      setupId 
+      setupId,
+      currentUrl: window.location.href,
+      params
     });
     
     // Only navigate home if this is truly a setup conversation (no real session exists)

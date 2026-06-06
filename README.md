@@ -72,4 +72,4 @@ The long-term vision is a system that helps people build communication skills th
 
 ## Built For
 
-ElevenLabs Hackathon 2026
+Rebuild X ElevenLabs Hackathon 2026

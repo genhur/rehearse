@@ -73,7 +73,7 @@ AI has become remarkably good at generating text, but many of the situations peo
 
 The long-term vision is a system that helps people build communication skills through repeated practice, much like language-learning apps help people build fluency through repetition.
 
-##Tech
+## Tech
 
 Rehearse was built using:
 

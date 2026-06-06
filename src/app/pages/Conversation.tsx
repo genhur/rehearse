@@ -4,7 +4,7 @@ import { useNavigate, useParams, useOutletContext } from 'react-router';
 import { Button } from '../components/Button';
 import { AppHeader } from '../components/AppHeader';
 import { FeedbackRail } from '../components/FeedbackRail';
-import { getSession, updateSession, sessionManager, type RehearsalSession, type RehearsalAttempt, type TranscriptTurn, type AudioAnalysis, type FeedbackReport } from '../../../lib/sessions';
+import { getSession, updateSession, sessionManager, getCurrentAttempt, getSetupConversation, updateSetupConversation, commitSetupToSession, type RehearsalSession, type RehearsalAttempt, type SetupConversation, type TranscriptTurn, type AudioAnalysis, type FeedbackReport } from '../../../lib/sessions';
 import { SimpleVoiceOrb } from '../components/SimpleVoiceOrb';
 import { Conversation as ElevenLabsConversation } from '@11labs/client';
 import type { Mode, Status } from '@11labs/client';
@@ -22,9 +22,10 @@ interface OutletContext {
 
 export function Conversation() {
   const navigate = useNavigate();
-  const { sessionId } = useParams<{ sessionId: string }>();
+  const { sessionId, setupId } = useParams<{ sessionId?: string; setupId?: string }>();
   const { openHistoryPanel } = useOutletContext<OutletContext>();
   const [session, setSession] = useState<RehearsalSession | null>(null);
+  const [setupConversation, setSetupConversation] = useState<SetupConversation | null>(null);
   const [currentAttempt, setCurrentAttempt] = useState<RehearsalAttempt | null>(null);
   const [transcript, setTranscript] = useState<TranscriptTurn[]>([]);
   const [conversationState, setConversationState] = useState<ConversationState>('idle');
@@ -38,9 +39,52 @@ export function Conversation() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const conversationRef = useRef<ElevenLabsConversation | null>(null);
 
-  useEffect(() => {
-    console.log('CONVERSATION_PAGE_MOUNTED', sessionId);
+  // Helper to determine if a call is currently active
+  const isCallActive = (): boolean => {
+    // Setup conversations are never "active calls"
+    if (setupConversation) return false;
     
+    const currentAttemptData = getCurrentAttempt(session);
+    return session?.status === 'active' && 
+           currentAttemptData?.status === 'active';
+  };
+
+  useEffect(() => {
+    console.log('CONVERSATION_PAGE_MOUNTED', { sessionId, setupId });
+    
+    // Handle setup conversation
+    if (setupId) {
+      const setupData = getSetupConversation(setupId);
+      if (!setupData) {
+        navigate('/');
+        return;
+      }
+      
+      setSetupConversation(setupData);
+      setSession(null);
+      setCurrentAttempt(null);
+      setTranscript(setupData.clarificationTranscript);
+      
+      // Add initial message if no transcript yet
+      if (setupData.clarificationTranscript.length === 0) {
+        const initialTurn = sessionManager.addSetupTranscriptTurn(
+          setupId,
+          'agent',
+          setupData.scenarioDraft === 'What difficult conversation are you avoiding today?' 
+            ? 'What conversation do you need to rehearse?'
+            : 'Let me ask you a few questions to help set up this roleplay scenario.'
+        );
+        setTranscript([initialTurn]);
+        
+        // Auto-start conversation for setup
+        setTimeout(() => {
+          handleStartConversation();
+        }, 1000);
+      }
+      return;
+    }
+
+    // Handle regular session
     if (!sessionId) {
       navigate('/');
       return;
@@ -53,28 +97,13 @@ export function Conversation() {
     }
 
     setSession(sessionData);
+    setSetupConversation(null);
     
-    // Get current attempt
-    const currentAttemptData = sessionManager.getCurrentAttempt(sessionId);
+    // Get current attempt using the helper function
+    const currentAttemptData = getCurrentAttempt(sessionData);
     setCurrentAttempt(currentAttemptData);
     setTranscript(currentAttemptData ? currentAttemptData.transcript : []);
-    
-    // Add initial intake message if this is a new session with no transcript
-    if (sessionData.scenario === 'What difficult conversation are you avoiding today?' && 
-        (!currentAttemptData || currentAttemptData.transcript.length === 0)) {
-      const initialTurn = sessionManager.addTranscriptTurn(
-        sessionId,
-        'agent',
-        'What conversation do you need to rehearse?'
-      );
-      setTranscript([initialTurn]);
-      
-      // Auto-start conversation immediately
-      setTimeout(() => {
-        handleStartConversation();
-      }, 500);
-    }
-  }, [sessionId, navigate]);
+  }, [sessionId, setupId, navigate]);
 
   useEffect(() => {
     // Scroll to bottom when new transcript turns arrive
@@ -134,7 +163,10 @@ export function Conversation() {
           // No live coaching during active conversation
           
           // Handle intake flow progression
-          if (speaker === 'user' && session?.scenario === 'What difficult conversation are you avoiding today?') {
+          if (speaker === 'user' && (
+            (session?.scenario === 'What difficult conversation are you avoiding today?') ||
+            (setupConversation?.scenarioDraft === 'What difficult conversation are you avoiding today?')
+          )) {
             handleIntakeResponse(message);
           }
         }
@@ -416,6 +448,38 @@ export function Conversation() {
   };
 
   const handleIntakeResponse = (userMessage: string) => {
+    // Handle setup conversation updates
+    if (setupConversation && setupId) {
+      const updatedSetup = {
+        ...setupConversation,
+        scenarioDraft: userMessage
+      };
+      
+      updateSetupConversation(updatedSetup);
+      setSetupConversation(updatedSetup);
+      
+      console.log('[Conversation] Updated setup conversation with user scenario:', { 
+        scenario: userMessage 
+      });
+      
+      // Check if we have enough information to commit to a session
+      // For now, commit after the user provides their scenario
+      if (updatedSetup.clarificationTranscript.length >= 2 && // At least one exchange
+          userMessage !== 'What difficult conversation are you avoiding today?' &&
+          userMessage.length > 10) { // User provided meaningful scenario
+        
+        console.log('[Conversation] Setup ready to commit to session');
+        
+        // Mark setup as ready and commit in next AI response
+        const readySetup = { ...updatedSetup, isReadyToStart: true };
+        updateSetupConversation(readySetup);
+        setSetupConversation(readySetup);
+      }
+      
+      return;
+    }
+    
+    // Legacy handling for existing sessions (this shouldn't happen with new flow)
     if (!sessionId || !session) return;
     
     // Update session with the user's scenario
@@ -432,6 +496,24 @@ export function Conversation() {
       scenario: userMessage,
       title: updatedSession.title 
     });
+  };
+
+  const commitSetupToSessionAndRedirect = async () => {
+    if (!setupConversation || !setupId) return;
+    
+    try {
+      console.log('[Conversation] Committing setup to session:', setupConversation);
+      
+      // Commit the setup conversation to a real session
+      const newSession = commitSetupToSession(setupId);
+      
+      console.log('[Conversation] Created session from setup:', newSession.id);
+      
+      // Navigate to the new session
+      navigate(`/conversation/${newSession.id}`);
+    } catch (error) {
+      console.error('[Conversation] Failed to commit setup to session:', error);
+    }
   };
 
   const generateFeedbackReport = async (audioBlob: Blob | null) => {
@@ -476,7 +558,7 @@ export function Conversation() {
         
         // Update local state
         const updatedSession = getSession(sessionId);
-        const updatedAttempt = sessionManager.getCurrentAttempt(sessionId);
+        const updatedAttempt = getCurrentAttempt(updatedSession);
         
         setSession(updatedSession);
         setCurrentAttempt(updatedAttempt);
@@ -526,7 +608,7 @@ export function Conversation() {
     
     // Update local state
     const updatedSession = getSession(sessionId);
-    const updatedAttempt = sessionManager.getCurrentAttempt(sessionId);
+    const updatedAttempt = getCurrentAttempt(updatedSession);
     
     setSession(updatedSession);
     setCurrentAttempt(updatedAttempt);
@@ -673,10 +755,18 @@ export function Conversation() {
   };
 
   const handleMockUserInput = (text: string) => {
-    if (!sessionId) return;
+    let userTurn;
     
-    const userTurn = sessionManager.addTranscriptTurn(sessionId, 'user', text);
-    setTranscript(prev => [...prev, userTurn]);
+    // Handle setup conversations vs regular sessions
+    if (setupConversation && setupId) {
+      userTurn = sessionManager.addSetupTranscriptTurn(setupId, 'user', text);
+      setTranscript(prev => [...prev, userTurn]);
+    } else if (sessionId) {
+      userTurn = sessionManager.addTranscriptTurn(sessionId, 'user', text);
+      setTranscript(prev => [...prev, userTurn]);
+    } else {
+      return; // No valid session or setup
+    }
     
     console.log('📝 TRANSCRIPT_TURN_ADDED (MOCK)', { 
       turnId: userTurn.id, 
@@ -690,7 +780,8 @@ export function Conversation() {
     // No live coaching during conversation
     
     // Handle intake response for mock too
-    if (session?.scenario === 'What difficult conversation are you avoiding today?') {
+    if ((session?.scenario === 'What difficult conversation are you avoiding today?') ||
+        (setupConversation?.scenarioDraft === 'What difficult conversation are you avoiding today?')) {
       handleIntakeResponse(text);
     }
     
@@ -700,7 +791,8 @@ export function Conversation() {
     setTimeout(() => {
       let responses: string[];
       
-      if (session?.scenario === 'What difficult conversation are you avoiding today?') {
+      if ((session?.scenario === 'What difficult conversation are you avoiding today?') ||
+          (setupConversation?.scenarioDraft === 'What difficult conversation are you avoiding today?')) {
         responses = [
           "That sounds important. Who do you need to have this conversation with?",
           "I understand. What outcome are you hoping for from this conversation?",
@@ -716,12 +808,26 @@ export function Conversation() {
         ];
       }
       
-      const aiTurn = sessionManager.addTranscriptTurn(
-        sessionId,
-        'agent',
-        responses[Math.floor(Math.random() * responses.length)]
-      );
-      setTranscript(prev => [...prev, aiTurn]);
+      const response = responses[Math.floor(Math.random() * responses.length)];
+      
+      // Handle setup conversations vs regular sessions
+      if (setupConversation && setupId) {
+        const aiTurn = sessionManager.addSetupTranscriptTurn(setupId, 'agent', response);
+        setTranscript(prev => [...prev, aiTurn]);
+        
+        // Check if setup is ready to transition to session
+        if (setupConversation.isReadyToStart) {
+          console.log('[Conversation] Setup is ready, will transition after this response');
+          // Transition after a short delay to let user see the response
+          setTimeout(() => {
+            commitSetupToSessionAndRedirect();
+          }, 2000);
+        }
+      } else if (sessionId) {
+        const aiTurn = sessionManager.addTranscriptTurn(sessionId, 'agent', response);
+        setTranscript(prev => [...prev, aiTurn]);
+      }
+      
       setConversationState('listening');
     }, 1500);
   };
@@ -735,6 +841,14 @@ export function Conversation() {
   }
 
   const getSessionTitle = (): string => {
+    // Handle setup conversations
+    if (setupConversation) {
+      if (setupConversation.scenarioDraft && setupConversation.scenarioDraft !== 'What difficult conversation are you avoiding today?') {
+        return setupConversation.scenarioDraft.length > 50 ? setupConversation.scenarioDraft.substring(0, 47) + '...' : setupConversation.scenarioDraft;
+      }
+      return 'Setup Conversation';
+    }
+    
     if (!session) return 'Loading...';
     
     // Use the generated title if it's not the default intake question
@@ -751,6 +865,14 @@ export function Conversation() {
   };
 
   const getSessionSubtitle = (): string | undefined => {
+    // Handle setup conversations
+    if (setupConversation) {
+      if (setupConversation.scenarioDraft === 'What difficult conversation are you avoiding today?') {
+        return 'Tell Rehearse what conversation you need to practice.';
+      }
+      return 'Setting up your roleplay scenario.';
+    }
+    
     if (!session) return undefined;
     
     // If this is the intake phase, show helper text
@@ -781,6 +903,8 @@ export function Conversation() {
         title={getSessionTitle()}
         subtitle={getSessionSubtitle()}
         status={getSessionStatus()}
+        showHomeButton={true}
+        showHistoryButton={true}
         onHistoryClick={openHistoryPanel}
       />
 
@@ -804,8 +928,8 @@ export function Conversation() {
             </div>
             
             <div className="flex items-center gap-3">
-              {/* Always show End Call button for active or ending attempts */}
-              {currentAttempt && (currentAttempt.status === 'active' || currentAttempt.status === 'ending') ? (
+              {/* Show End Call button for active sessions and attempts */}
+              {(isCallActive() || currentAttempt?.status === 'ending') ? (
                 <Button
                   onClick={handleEndConversation}
                   variant="destructive"

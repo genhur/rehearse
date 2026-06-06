@@ -1,3 +1,15 @@
+export type SetupConversation = {
+  id: string;
+  scenarioDraft: string;
+  clarificationTranscript: TranscriptTurn[];
+  isReadyToStart: boolean;
+  characterName?: string;
+  characterRole?: string;
+  goal?: string;
+  worry?: string;
+  createdAt: string;
+};
+
 export type RehearsalSession = {
   id: string;
   title: string;
@@ -8,6 +20,7 @@ export type RehearsalSession = {
   status: "active" | "complete";
   createdAt: string;
   updatedAt: string;
+  currentAttemptId?: string;
   attempts: RehearsalAttempt[];
   latestReport?: FeedbackReport;
 };
@@ -167,6 +180,7 @@ export function detectSessionCategory(scenario: string): "professional" | "perso
 // Session storage utilities
 class SessionManager {
   private sessions: Map<string, RehearsalSession> = new Map();
+  private setupConversations: Map<string, SetupConversation> = new Map();
   
   constructor() {
     this.loadFromStorage();
@@ -231,6 +245,7 @@ class SessionManager {
       status: 'active',
       createdAt: now,
       updatedAt: now,
+      currentAttemptId: attemptId,
       attempts: [firstAttempt]
     };
     
@@ -309,6 +324,7 @@ class SessionManager {
     };
     
     session.attempts.push(newAttempt);
+    session.currentAttemptId = attemptId;
     session.status = 'active';
     this.updateSession(session);
     return newAttempt;
@@ -329,6 +345,14 @@ class SessionManager {
       if (audioAnalysis) {
         currentAttempt.audioAnalysis = audioAnalysis;
       }
+      
+      // Clear currentAttemptId since this attempt is now complete
+      if (session.currentAttemptId === currentAttempt.id) {
+        session.currentAttemptId = undefined;
+      }
+      
+      // Mark session as complete
+      session.status = 'complete';
     }
     
     this.updateSession(session);
@@ -338,14 +362,112 @@ class SessionManager {
     const session = this.sessions.get(sessionId);
     if (!session) return null;
     
-    return session.attempts[session.attempts.length - 1] || null;
+    // First, check if there's a currentAttemptId set
+    if (session.currentAttemptId) {
+      const attempt = session.attempts.find(a => a.id === session.currentAttemptId);
+      if (attempt) return attempt;
+    }
+    
+    // Fallback: find the latest active attempt, or the last attempt if none are active
+    return [...session.attempts]
+      .reverse()
+      .find(a => a.status === 'active') ?? (session.attempts[session.attempts.length - 1] || null);
   }
+
+  // Setup conversation management (transient, not persisted)
+  createSetupConversation(scenarioDraft: string): SetupConversation {
+    const setupId = `setup_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const now = new Date().toISOString();
+    
+    const setupConversation: SetupConversation = {
+      id: setupId,
+      scenarioDraft,
+      clarificationTranscript: [],
+      isReadyToStart: false,
+      createdAt: now
+    };
+    
+    this.setupConversations.set(setupId, setupConversation);
+    return setupConversation;
+  }
+  
+  getSetupConversation(id: string): SetupConversation | null {
+    return this.setupConversations.get(id) || null;
+  }
+  
+  updateSetupConversation(setup: SetupConversation): void {
+    this.setupConversations.set(setup.id, setup);
+  }
+  
+  addSetupTranscriptTurn(setupId: string, speaker: 'user' | 'agent', text: string): TranscriptTurn {
+    const setup = this.setupConversations.get(setupId);
+    if (!setup) {
+      throw new Error(`Setup conversation ${setupId} not found`);
+    }
+    
+    const turn: TranscriptTurn = {
+      id: `turn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      speaker,
+      speakerName: speaker === 'user' ? 'You' : 'Rehearse',
+      text,
+      timestamp: new Date().toISOString()
+    };
+    
+    setup.clarificationTranscript.push(turn);
+    this.updateSetupConversation(setup);
+    return turn;
+  }
+  
+  // Convert setup conversation to a real session
+  commitSetupToSession(setupId: string): RehearsalSession {
+    const setup = this.setupConversations.get(setupId);
+    if (!setup) {
+      throw new Error(`Setup conversation ${setupId} not found`);
+    }
+    
+    if (!setup.isReadyToStart) {
+      throw new Error(`Setup conversation ${setupId} is not ready to start`);
+    }
+    
+    // Create a real session using the setup data
+    const session = this.createSession(
+      setup.scenarioDraft,
+      setup.characterRole || '',
+      setup.goal || '',
+      setup.worry || ''
+    );
+    
+    // Clean up the setup conversation since it's now committed
+    this.setupConversations.delete(setupId);
+    
+    return session;
+  }
+  
+  deleteSetupConversation(id: string): void {
+    this.setupConversations.delete(id);
+  }
+}
+
+// Helper function to get current attempt for a session
+export function getCurrentAttempt(session: RehearsalSession | null): RehearsalAttempt | null {
+  if (!session) return null;
+  
+  // First, check if there's a currentAttemptId set
+  if (session.currentAttemptId) {
+    const attempt = session.attempts.find(a => a.id === session.currentAttemptId);
+    if (attempt) return attempt;
+  }
+  
+  // Fallback: find the latest active attempt, or the last attempt if none are active
+  return [...session.attempts]
+    .reverse()
+    .find(a => a.status === 'active') ?? (session.attempts[session.attempts.length - 1] || null);
 }
 
 // Global session manager instance
 export const sessionManager = new SessionManager();
 
-// Convenience functions
+// Convenience functions for sessions
 export const getSessions = () => sessionManager.getSessions();
 export const getSession = (id: string) => sessionManager.getSession(id);
 export const createSession = (scenario: string, characterRole?: string, goal?: string, worry?: string) => 
@@ -353,3 +475,9 @@ export const createSession = (scenario: string, characterRole?: string, goal?: s
 export const updateSession = (session: RehearsalSession) => sessionManager.updateSession(session);
 export const completeSession = (id: string, report?: FeedbackReport) => sessionManager.completeSession(id, report);
 export const deleteSession = (id: string) => sessionManager.deleteSession(id);
+
+// Convenience functions for setup conversations
+export const createSetupConversation = (scenarioDraft: string) => sessionManager.createSetupConversation(scenarioDraft);
+export const getSetupConversation = (id: string) => sessionManager.getSetupConversation(id);
+export const updateSetupConversation = (setup: SetupConversation) => sessionManager.updateSetupConversation(setup);
+export const commitSetupToSession = (setupId: string) => sessionManager.commitSetupToSession(setupId);

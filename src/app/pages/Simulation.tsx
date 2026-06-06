@@ -13,7 +13,7 @@ export function Simulation() {
   const [trust, setTrust] = useState(50);
   const [tension, setTension] = useState(30);
   const [recordedAudio, setRecordedAudio] = useState<File | null>(null);
-  
+
   const scenario = location.state?.scenario || 'Default conversation practice';
 
   useEffect(() => {
@@ -38,11 +38,11 @@ export function Simulation() {
 
   const handleEndSimulation = () => {
     // Pass the recorded audio and scenario to the debrief page
-    navigate('/debrief', { 
-      state: { 
-        audioFile: recordedAudio, 
-        scenario: scenario 
-      } 
+    navigate('/debrief', {
+      state: {
+        audioFile: recordedAudio,
+        scenario: scenario
+      }
     });
   };
 

@@ -2,7 +2,7 @@ import { motion } from 'motion/react';
 import { useNavigate, useOutletContext } from 'react-router';
 import { VoiceOrb } from '../components/VoiceOrb';
 import { AppHeader } from '../components/AppHeader';
-import { createSession } from '../../../lib/sessions';
+import { createSetupConversation } from '../../../lib/sessions';
 
 interface OutletContext {
   openHistoryPanel: () => void;
@@ -21,12 +21,12 @@ export function Home() {
   const handleExampleClick = (example: string) => {
     console.log('EXAMPLE_CLICKED', example);
     
-    // Create a new session and go directly to conversation
-    const session = createSession(example);
-    console.log('SESSION_CREATED_FROM_EXAMPLE', session);
+    // Create a setup conversation instead of a full session
+    const setupConversation = createSetupConversation(example);
+    console.log('SETUP_CREATED_FROM_EXAMPLE', setupConversation);
     
-    // Navigate directly to conversation
-    const route = `/conversation/${session.id}`;
+    // Navigate to conversation with setup ID
+    const route = `/conversation/setup/${setupConversation.id}`;
     console.log('NAVIGATING_TO', route);
     navigate(route);
   };
@@ -34,14 +34,14 @@ export function Home() {
   const handleStartNewRehearsal = () => {
     console.log('HOME_CIRCLE_CLICKED');
     
-    // Create a new session for intake
-    const session = createSession(
+    // Create a setup conversation for intake
+    const setupConversation = createSetupConversation(
       'What difficult conversation are you avoiding today?'
     );
-    console.log('SESSION_CREATED_HOME', session);
+    console.log('SETUP_CREATED_HOME', setupConversation);
     
-    // Navigate immediately to conversation for intake
-    const route = `/conversation/${session.id}`;
+    // Navigate to conversation with setup ID
+    const route = `/conversation/setup/${setupConversation.id}`;
     console.log('NAVIGATING_TO_HOME', route);
     navigate(route);
   };
@@ -50,7 +50,7 @@ export function Home() {
     <div className="min-h-screen bg-background flex flex-col">
       {/* App Header for Home */}
       <AppHeader
-        showBackButton={false}
+        showHomeButton={false}
         showHistoryButton={true}
         onHistoryClick={openHistoryPanel}
       />

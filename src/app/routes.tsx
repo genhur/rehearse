@@ -28,6 +28,10 @@ export const router = createBrowserRouter([
         Component: Conversation,
       },
       {
+        path: "conversation/setup/:setupId",
+        Component: Conversation,
+      },
+      {
         path: "debrief/:sessionId",
         Component: Debrief,
       },

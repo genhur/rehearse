@@ -1,11 +1,11 @@
 import { Button } from './Button';
-import { ArrowLeft, History, Circle } from 'lucide-react';
+import { ArrowLeft, History, Circle, Home } from 'lucide-react';
 import { useNavigate } from 'react-router';
 
 interface AppHeaderProps {
   title?: string;
   subtitle?: string;
-  showBackButton?: boolean;
+  showHomeButton?: boolean;
   showHistoryButton?: boolean;
   status?: 'active' | 'complete' | 'idle';
   onHistoryClick?: () => void;
@@ -14,14 +14,14 @@ interface AppHeaderProps {
 export function AppHeader({ 
   title, 
   subtitle, 
-  showBackButton = true,
+  showHomeButton = true,
   showHistoryButton = true, 
   status,
   onHistoryClick 
 }: AppHeaderProps) {
   const navigate = useNavigate();
 
-  const handleBackClick = () => {
+  const handleHomeClick = () => {
     navigate('/');
   };
 
@@ -51,32 +51,35 @@ export function AppHeader({
     <div className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-20">
       <div className="px-6 py-4">
         <div className="flex items-center justify-between">
-          {/* Left: Home navigation */}
-          <div className="flex items-center gap-4 flex-shrink-0">
-            {showBackButton ? (
+          {/* Left: Navigation controls */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {showHomeButton && (
               <Button
-                onClick={handleBackClick}
+                onClick={handleHomeClick}
                 variant="ghost"
                 size="sm"
-                className="flex items-center gap-2 text-muted-foreground hover:text-foreground p-2"
+                className="p-2 text-muted-foreground hover:text-foreground"
+                aria-label="Go home"
               >
-                <ArrowLeft className="w-4 h-4" />
-                <span className="hidden sm:inline">Rehearse</span>
+                <Home className="w-4 h-4" />
               </Button>
-            ) : (
-              <div className="px-2 py-1">
-                <span 
-                  className="text-sm font-medium tracking-wider uppercase text-muted-foreground/60"
-                  style={{ letterSpacing: '0.15em' }}
-                >
-                  Rehearse
-                </span>
-              </div>
+            )}
+            
+            {showHistoryButton && (
+              <Button
+                onClick={onHistoryClick}
+                variant="ghost"
+                size="sm"
+                className="p-2 text-muted-foreground hover:text-foreground"
+                aria-label="Open rehearsal history"
+              >
+                <History className="w-4 h-4" />
+              </Button>
             )}
           </div>
 
           {/* Center: Session title and subtitle */}
-          <div className="flex-1 text-center px-4 min-w-0">
+          <div className="flex-1 text-left px-4 min-w-0" style={{ marginLeft: '1rem' }}>
             {title && (
               <div>
                 <h1 className="text-lg font-medium truncate">{title}</h1>
@@ -87,24 +90,13 @@ export function AppHeader({
             )}
           </div>
 
-          {/* Right: Controls and status */}
+          {/* Right: Status and metadata */}
           <div className="flex items-center gap-4 flex-shrink-0">
             {status && (
               <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
                 {getStatusIndicator()}
                 <span>{getStatusLabel()}</span>
               </div>
-            )}
-            
-            {showHistoryButton && (
-              <Button
-                onClick={onHistoryClick}
-                variant="ghost"
-                size="sm"
-                className="p-2"
-              >
-                <History className="w-5 h-5" />
-              </Button>
             )}
           </div>
         </div>

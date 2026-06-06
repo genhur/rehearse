@@ -821,20 +821,120 @@ export function Conversation() {
     }
   };
 
-  const endCurrentAttempt = async () => {
-    if (!sessionId) return;
-    
-    console.log('🔚 ENDING_CURRENT_ATTEMPT', { sessionId });
+  const generateFallbackFeedbackReport = (): any => {
+    return {
+      overallAssessment: "This was a practice conversation to help you prepare for the real thing.",
+      howYouCameAcross: "You participated actively in the conversation practice.",
+      whatWorked: [
+        "You engaged with the conversation scenario",
+        "You practiced important communication skills"
+      ],
+      opportunities: [
+        "Consider practicing different responses",
+        "Think about your tone and delivery"
+      ],
+      replayMoments: transcript.length > 0 ? [
+        {
+          turnId: transcript[Math.floor(transcript.length / 2)]?.id || transcript[0]?.id,
+          title: "Key moment",
+          description: "Review this exchange for improvement opportunities"
+        }
+      ] : []
+    };
+  };
+
+  const forceCompleteCurrentConversation = () => {
+    console.log('🔚 FORCE_COMPLETE_CONVERSATION', { sessionId, session, currentAttempt });
     
     // Clear inactivity timeout
     clearInactivityTimeout();
     
-    // End ElevenLabs conversation
+    // Set local voice state to idle / inactive
+    setIsSessionActive(false);
+    setConversationState('idle');
+    setIsRecording(false);
+    
+    // Try to stop ElevenLabs session but don't block on it
     if (conversationRef.current) {
+      try {
+        conversationRef.current.endSession();
+        conversationRef.current = null;
+      } catch (error) {
+        console.log('ElevenLabs cleanup failed, continuing anyway:', error);
+      }
+    }
+    
+    // Stop audio recording but don't block
+    if (isRecording) {
+      try {
+        audioRecordingService.stopRecording();
+      } catch (error) {
+        console.log('Audio recording cleanup failed, continuing anyway:', error);
+      }
+    }
+    
+    if (!sessionId || !session) {
+      console.log('No valid session to complete');
+      return;
+    }
+    
+    // Force complete the session state
+    const now = new Date().toISOString();
+    
+    const updatedSession = {
+      ...session,
+      status: 'complete' as const,
+      phase: 'complete' as const
+    };
+    
+    const updatedAttempt = currentAttempt ? {
+      ...currentAttempt,
+      status: 'complete' as const,
+      endedAt: now,
+      feedbackReport: currentAttempt.feedbackReport || generateFallbackFeedbackReport()
+    } : null;
+    
+    // Update the attempt in the session
+    if (updatedSession.attempts && updatedAttempt) {
+      const attemptIndex = updatedSession.attempts.findIndex(a => a.id === updatedAttempt.id);
+      if (attemptIndex >= 0) {
+        updatedSession.attempts[attemptIndex] = updatedAttempt;
+      }
+    }
+    
+    // Persist to localStorage
+    try {
+      endSessionAttempt(sessionId);
+    } catch (error) {
+      console.log('Session persistence failed, updating local state anyway:', error);
+    }
+    
+    // Update local state immediately
+    setSession(updatedSession);
+    setCurrentAttempt(updatedAttempt);
+    
+    console.log('Session force completed:', { updatedSession, updatedAttempt });
+  };
+
+  const forceEndCurrentSession = async () => {
+    if (!sessionId) {
+      console.log('ERROR: No sessionId when trying to end session');
+      return;
+    }
+    
+    console.log('🔚 FORCE_END_SESSION', { sessionId, session, currentAttempt });
+    
+    // Clear inactivity timeout
+    clearInactivityTimeout();
+    
+    // Stop voice interaction if available
+    if (conversationRef.current) {
+      console.log('Ending ElevenLabs conversation');
       await conversationRef.current.endSession();
       conversationRef.current = null;
     }
     
+    // Set voice state to idle
     setIsSessionActive(false);
     setConversationState('idle');
     
@@ -846,20 +946,31 @@ export function Conversation() {
     }
     
     // Generate feedback report with audio analysis
-    await generateFeedbackReport(audioBlob);
-    
-    // Update session status to completed
-    if (session) {
-      session.status = 'complete';
-      updateSession(session);
+    try {
+      await generateFeedbackReport(audioBlob);
+    } catch (error) {
+      console.log('Feedback generation failed, but continuing with session completion');
     }
     
-    // Update local state
+    // Use the proper library function to complete the attempt
+    // This sets session.status = "complete", session.phase = "complete", 
+    // currentAttempt.status = "complete", currentAttempt.endedAt = now, and persists
+    console.log('Calling endSessionAttempt with sessionId:', sessionId);
+    endSessionAttempt(sessionId);
+    console.log('endSessionAttempt called successfully');
+    
+    // Update local state to reflect the changes
     const updatedSession = getSession(sessionId);
     const updatedAttempt = getCurrentAttempt(updatedSession);
     
+    console.log('Session completed:', { updatedSession, updatedAttempt });
+    
     setSession(updatedSession);
     setCurrentAttempt(updatedAttempt);
+  };
+
+  const endCurrentAttempt = async () => {
+    await forceEndCurrentSession();
   };
 
   // Centralized function to end the current conversation
@@ -868,7 +979,8 @@ export function Conversation() {
   };
 
   const handleEndConversation = () => {
-    endCurrentConversation();
+    console.log("END_CALL_CLICKED");
+    forceCompleteCurrentConversation();
   };
 
   const handleViewFeedback = () => {
@@ -976,47 +1088,56 @@ export function Conversation() {
   };
 
   const checkForNaturalEnding = (message: string) => {
-    if (!isSessionActive) return;
+    // Only check assistant messages when session is actually in simulation phase
+    if (!session || !currentAttempt) return;
+    if (session.phase !== 'simulation') return;
+    if (session.status !== 'active') return;
+    if (currentAttempt.status !== 'active') return;
+    
+    // Require minimum conversation length before auto-ending
+    const totalTurns = transcript.length;
+    const userTurns = transcript.filter(turn => turn.speaker === 'user').length;
+    
+    if (totalTurns < 6) {
+      console.log('🏁 NATURAL_ENDING: Insufficient transcript length', { totalTurns, required: 6 });
+      return;
+    }
+    
+    if (userTurns < 2) {
+      console.log('🏁 NATURAL_ENDING: Insufficient user turns', { userTurns, required: 2 });
+      return;
+    }
     
     const lowerMessage = message.toLowerCase().trim();
-    const naturalEndingPhrases = [
+    
+    // Only strong closing phrases that indicate explicit simulation end
+    const strongClosingPhrases = [
       'simulation complete',
+      'that\'s the end of the rehearsal',
+      'we can stop here',
       'good luck with the real conversation',
       'take care',
-      'we\'ll stop here',
-      'that\'s the end of the rehearsal',
-      'ready for feedback',
-      'we can stop here',
-      'that feels like a good place to stop',
-      'take care, and good luck with the real conversation',
-      'good luck with the actual conversation',
-      'i hope this practice helps with the real conversation',
-      'best of luck when you have the real conversation',
-      'hope this helps you feel more prepared',
-      'you seem ready for the real conversation',
-      'i think you\'re well-prepared now',
-      'this should help you feel more confident',
-      'you\'ve got this',
-      'i believe you\'re ready',
-      'feel free to practice again',
-      'let me know if you want to practice more',
-      'would you like to run through this again',
-      'shall we wrap up here'
+      'want to run it again'
     ];
     
-    const isNaturalEnding = naturalEndingPhrases.some(phrase => 
+    const isStrongClosing = strongClosingPhrases.some(phrase => 
       lowerMessage.includes(phrase)
     );
     
-    if (isNaturalEnding) {
-      console.log('🏁 NATURAL_ENDING_DETECTED', { message: lowerMessage });
+    if (isStrongClosing) {
+      console.log('🏁 NATURAL_ENDING_DETECTED', { 
+        message: lowerMessage, 
+        totalTurns, 
+        userTurns,
+        sessionPhase: session.phase,
+        sessionStatus: session.status,
+        attemptStatus: currentAttempt.status
+      });
       
-      // Wait 1 second for user to read the message, then end
+      // Wait 1 second for user to read the message, then force complete
       setTimeout(() => {
-        if (isSessionActive) { // Check if still active
-          endCurrentConversation();
-        }
-      }, 1000); // 1 second delay as requested
+        forceCompleteCurrentConversation();
+      }, 1000);
     }
   };
 
@@ -1308,6 +1429,10 @@ export function Conversation() {
   // Extract the exact active condition used by the header
   const shouldShowActiveStatus = isSessionActive;
   const shouldShowEndCall = shouldShowActiveStatus;
+  
+  // Debug logging
+  console.log("Conversation render: isSessionActive =", isSessionActive);
+  console.log("Conversation render: shouldShowEndCall =", shouldShowEndCall);
 
   const getSessionStatus = (): 'active' | 'complete' | 'idle' => {
     if (shouldShowActiveStatus) return 'active';
@@ -1433,7 +1558,7 @@ export function Conversation() {
                     {currentAttempt.feedbackReport && (
                       <Button
                         onClick={handleViewFeedback}
-                        variant="default"
+                        variant="primary"
                         size="sm"
                         className="bg-purple-600 hover:bg-purple-700"
                       >

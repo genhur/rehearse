@@ -105,7 +105,10 @@ export function AppHeader({
             
             {showEndCall && (
               <Button
-                onClick={onEndCall}
+                onClick={() => {
+                  console.log("AppHeader: End call button clicked");
+                  onEndCall?.();
+                }}
                 variant="destructive"
                 size="sm"
                 className="flex items-center gap-2"

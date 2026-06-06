@@ -7,11 +7,13 @@ Rehearse is a voice AI that helps people prepare for difficult conversations bef
 
 Describe a conversation you're avoiding, practice it with an AI simulation, review what happened, and try again.
 
-The idea came from a simple observation: most difficult conversations are rehearsed in our heads, but very few are ever practiced out loud.
+The idea came from a simple observation: Many of the outcomes that shape our lives come down to our ability to have difficult conversations. The conversation where you set a boundary with someone you love. The conversation where you tell your team the company is in trouble. 
+
+This is arguably the most important skill in the world, yet most people have no way to practice them with gentle and honest feedback. So we fumble reputations, relationships, and opportunities, and struggle to understand why. 
 
 Whether you're asking your manager for a promotion, setting a boundary with a loved one, or delivering difficult news to a teammate, the stakes often feel high because you only get one real attempt.
 
-Rehearse gives people a chance to practice first.
+Rehearse gives people a chance to practice and get objective feedback so they can do better.
 
 ## What It Does
 

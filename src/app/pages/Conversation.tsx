@@ -844,6 +844,7 @@ export function Conversation() {
   };
 
   const forceCompleteCurrentConversation = () => {
+    console.trace("FORCE_COMPLETE_CALLED");
     console.log('🔚 FORCE_COMPLETE_CONVERSATION', { sessionId, session, currentAttempt });
     
     // Clear inactivity timeout
@@ -1078,12 +1079,12 @@ export function Conversation() {
     if (isDecline) {
       console.log('🛑 USER_DECLINE_DETECTED', { message: lowerMessage });
       
-      // Allow brief response time then end
-      setTimeout(() => {
-        if (isSessionActive) { // Check if still active
-          endCurrentAttempt();
-        }
-      }, 2000); // 2 second delay to allow final agent response
+      // DISABLED: Auto-ending on user decline for demo safety
+      // setTimeout(() => {
+      //   if (isSessionActive) { // Check if still active
+      //     endCurrentAttempt();
+      //   }
+      // }, 2000); // 2 second delay to allow final agent response
     }
   };
 
@@ -1134,10 +1135,10 @@ export function Conversation() {
         attemptStatus: currentAttempt.status
       });
       
-      // Wait 1 second for user to read the message, then force complete
-      setTimeout(() => {
-        forceCompleteCurrentConversation();
-      }, 1000);
+      // DISABLED: Auto-ending for demo safety
+      // setTimeout(() => {
+      //   forceCompleteCurrentConversation();
+      // }, 1000);
     }
   };
 
@@ -1147,13 +1148,13 @@ export function Conversation() {
       clearTimeout(inactivityTimeoutRef.current);
     }
     
-    // Start a new timeout (5 minutes of inactivity)
-    inactivityTimeoutRef.current = setTimeout(() => {
-      if (isSessionActive) {
-        console.log('⏰ CONVERSATION_TIMEOUT_REACHED');
-        endCurrentAttempt();
-      }
-    }, 5 * 60 * 1000); // 5 minutes
+    // DISABLED: Inactivity timeout for demo safety
+    // inactivityTimeoutRef.current = setTimeout(() => {
+    //   if (isSessionActive) {
+    //     console.log('⏰ CONVERSATION_TIMEOUT_REACHED');
+    //     endCurrentAttempt();
+    //   }
+    // }, 5 * 60 * 1000); // 5 minutes
   };
 
   const clearInactivityTimeout = () => {

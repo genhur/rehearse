@@ -980,16 +980,23 @@ export function Conversation() {
   };
 
   const handleEndConversation = () => {
-    console.log("END_CALL_CLICKED");
+    console.log("END_CALL_CLICKED", { 
+      hasSetupConversation: Boolean(setupConversation), 
+      hasSessionId: Boolean(sessionId), 
+      hasSession: Boolean(session),
+      sessionPhase: session?.phase,
+      setupId 
+    });
     
-    // Handle setup conversations - navigate away instead of completing
-    if (setupConversation && !sessionId) {
-      console.log("END_CALL: Setup conversation, navigating home");
+    // Only navigate home if this is truly a setup conversation (no real session exists)
+    if (setupConversation && !sessionId && !session) {
+      console.log("END_CALL: Pure setup conversation, navigating home");
       navigate('/');
       return;
     }
     
-    // Handle regular sessions
+    // Handle regular sessions or setup that has been converted to session
+    console.log("END_CALL: Completing conversation");
     forceCompleteCurrentConversation();
   };
 

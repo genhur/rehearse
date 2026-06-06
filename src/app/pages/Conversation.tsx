@@ -2,13 +2,11 @@ import { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { useNavigate, useParams } from 'react-router';
 import { Button } from '../components/Button';
-import { sessionStorage, Session, Message } from '../../../lib/session';
+import { sessionStorage, Session, Message, Annotation, KeyMoment } from '../../../lib/session';
 import { SimpleVoiceOrb } from '../components/SimpleVoiceOrb';
 import { Conversation as ElevenLabsConversation } from '@11labs/client';
 import type { Mode, Status } from '@11labs/client';
-import { Phone, PhoneOff, MessageCircle } from 'lucide-react';
-import { CoachPanel } from '../components/CoachPanel';
-import { liveCoachingService, CoachNote } from '../../../lib/live-coaching';
+import { Phone, PhoneOff, Play } from 'lucide-react';
 
 const AGENT_ID = 'agent_4901ktej496kfp1a1kwj03q037ey';
 
@@ -22,9 +20,8 @@ export function Conversation() {
   const [conversationState, setConversationState] = useState<ConversationState>('idle');
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [elevenLabsMode, setElevenLabsMode] = useState<Mode>('listening');
-  const [coachNotes, setCoachNotes] = useState<CoachNote[]>([]);
-  const [isCoachPanelOpen, setIsCoachPanelOpen] = useState(false);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  const [showKeyMoments, setShowKeyMoments] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const conversationRef = useRef<ElevenLabsConversation | null>(null);
 
@@ -45,9 +42,7 @@ export function Conversation() {
     setSession(sessionData);
     setMessages(sessionData.messages);
     
-    // Load existing coach notes for this session
-    const existingNotes = liveCoachingService.getCoachNotes(sessionId);
-    setCoachNotes(existingNotes);
+    // No live coaching during conversation - annotations come post-debrief
     
     // Add initial intake message if this is a new intake session
     if (sessionData.phase === 'intake' && sessionData.messages.length === 0) {
@@ -109,13 +104,7 @@ export function Conversation() {
             sessionId 
           });
           
-          // Handle live coaching for user messages
-          if (role === 'user' && session) {
-            console.log('🎯 TRIGGERING_LIVE_COACHING', { messageId: newMessage.id });
-            handleLiveCoaching(newMessage);
-          } else {
-            console.log('🎯 SKIPPING_LIVE_COACHING', { role, hasSession: !!session });
-          }
+          // No live coaching during active conversation
           
           // Handle intake flow progression
           if (role === 'user' && session?.phase === 'intake') {
@@ -135,73 +124,66 @@ export function Conversation() {
     }
   };
 
-  const handleLiveCoaching = async (userMessage: Message) => {
-    if (!session || !sessionId) {
-      console.log('🎯 COACH_ANALYSIS_SKIPPED', { hasSession: !!session, hasSessionId: !!sessionId });
-      return;
-    }
+  const generateAnnotations = async () => {
+    if (!session || !sessionId) return;
     
-    // Get recent messages for context
-    const recentMessages = messages.slice(-4); // Last 4 messages including this one
+    // Generate 2-4 annotations for key moments in the conversation
+    const userMessages = messages.filter(m => m.role === 'user');
+    if (userMessages.length === 0) return;
     
-    const coachingRequest = {
-      sessionId,
-      latestUserMessage: userMessage,
-      recentMessages,
-      sessionContext: {
-        scenario: session.scenario,
-        role: session.role,
-        phase: session.phase
+    // Mock annotations for now - in real app, this would call AI service
+    const mockAnnotations = [
+      {
+        messageId: userMessages[Math.floor(userMessages.length * 0.3)]?.id || userMessages[0].id,
+        title: 'Vague answer',
+        body: 'Your cofounder was asking for a concrete runway number.',
+        type: 'vague_answer' as const
+      },
+      {
+        messageId: userMessages[Math.floor(userMessages.length * 0.7)]?.id || userMessages[userMessages.length - 1].id,
+        title: 'Strong ownership',
+        body: 'You acknowledged responsibility directly.',
+        type: 'strong_ownership' as const
       }
-    };
+    ];
     
-    console.log('🎯 COACH_ANALYSIS_STARTING', {
-      messageId: userMessage.id,
-      messageText: userMessage.text,
-      sessionId,
-      currentCoachNotes: coachNotes.length
+    const annotations: Annotation[] = [];
+    const keyMoments: KeyMoment[] = [];
+    
+    mockAnnotations.forEach((mock, index) => {
+      const annotation = sessionStorage.addAnnotation(
+        sessionId,
+        mock.messageId,
+        mock.title,
+        mock.body,
+        mock.type
+      );
+      
+      const keyMoment = sessionStorage.addKeyMoment(
+        sessionId,
+        annotation.id,
+        mock.messageId,
+        mock.title,
+        mock.body
+      );
+      
+      annotations.push(annotation);
+      keyMoments.push(keyMoment);
     });
     
-    try {
-      const note = await liveCoachingService.analyzeMessage(coachingRequest);
-      if (note) {
-        console.log('🎯 COACH_NOTE_RECEIVED', note);
-        
-        // Update messages state to include coach note flag
-        setMessages(prev => {
-          const updated = prev.map(m => 
-            m.id === userMessage.id ? { ...m, hasCoachNote: true } : m
-          );
-          console.log('🎯 COACH_NOTE_ATTACHED_TO_MESSAGE', { messageId: userMessage.id, updated });
-          return updated;
-        });
-        
-        // Update session storage with the coach note flag
-        const currentSession = sessionStorage.getSession(sessionId);
-        if (currentSession) {
-          const updatedMessages = currentSession.messages.map(m =>
-            m.id === userMessage.id ? { ...m, hasCoachNote: true } : m
-          );
-          sessionStorage.updateSession(sessionId, { messages: updatedMessages });
-          console.log('🎯 COACH_NOTE_SAVED_TO_STORAGE', { messageId: userMessage.id });
-        }
-        
-        setCoachNotes(prev => {
-          const newNotes = [...prev, note];
-          console.log('🎯 COACH_PANEL_NOTE_COUNT', { 
-            previousCount: prev.length, 
-            newCount: newNotes.length 
-          });
-          return newNotes;
-        });
-        
-        // Don't auto-open coach panel - inline notes are primary now
-      } else {
-        console.log('🎯 COACH_ANALYSIS_NO_NOTE_RETURNED');
-      }
-    } catch (error) {
-      console.error('🎯 COACH_ANALYSIS_ERROR:', error);
-    }
+    // Update local session state
+    setSession(prev => prev ? {
+      ...prev,
+      debriefComplete: true,
+      annotations,
+      keyMoments
+    } : null);
+    
+    // Update messages to show annotation flags
+    setMessages(prev => prev.map(m => ({
+      ...m,
+      hasAnnotation: annotations.some(a => a.messageId === m.id)
+    })));
   };
 
   const handleIntakeResponse = (userMessage: string) => {
@@ -269,11 +251,13 @@ export function Conversation() {
     // Update session status to completed
     sessionStorage.updateSessionStatus(sessionId, 'completed');
     
-    // Clear live coaching for this session
-    liveCoachingService.clearSession(sessionId);
-    
     // Update local session state to reflect completion
     setSession(prev => prev ? { ...prev, status: 'completed' } : null);
+    
+    // Generate annotations after a brief delay to let the debrief finish
+    setTimeout(() => {
+      generateAnnotations();
+    }, 3000);
   };
 
   const handleViewDebrief = () => {
@@ -281,7 +265,22 @@ export function Conversation() {
     navigate(`/debrief/${sessionId}`);
   };
 
-  const handlePracticeAgain = () => {
+  const handleRunItAgain = () => {
+    if (!session) return;
+    
+    // Create a new session with the same setup
+    const newSession = sessionStorage.createSession(
+      session.scenario,
+      session.role,
+      session.goal,
+      session.worry
+    );
+    
+    // Navigate to the new conversation
+    navigate(`/conversation/${newSession.id}`);
+  };
+
+  const handleBackHome = () => {
     navigate('/');
   };
 
@@ -297,54 +296,13 @@ export function Conversation() {
       .trim();
   };
 
-  const handleAddTestCoachNote = () => {
-    if (!sessionId) return;
+  const handleScrollToMoment = (messageId: string) => {
+    setHighlightedMessageId(messageId);
+    const messageElement = document.getElementById(`message-${messageId}`);
+    messageElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     
-    // Get the latest user message
-    const userMessages = messages.filter(m => m.role === 'user');
-    if (userMessages.length === 0) return;
-    
-    const latestUserMessage = userMessages[userMessages.length - 1];
-    
-    console.log('🎯 ADDING_TEST_COACH_NOTE', {
-      messageId: latestUserMessage.id,
-      messageText: latestUserMessage.text
-    });
-    
-    const testNote = {
-      id: `note_test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      messageId: latestUserMessage.id,
-      sessionId,
-      type: 'vague_response' as any,
-      severity: 'neutral' as any,
-      text: `You said "${latestUserMessage.text.slice(0, 30)}..." without giving specifics when they likely need concrete details.`,
-      suggestion: 'Try: "We have exactly 8 weeks of runway left based on current burn rate."',
-      createdAt: Date.now()
-    };
-    
-    // Add note to coaching service
-    liveCoachingService.addCoachNotePublic(sessionId, testNote);
-    
-    // Update messages state to include coach note flag
-    setMessages(prev => prev.map(m => 
-      m.id === latestUserMessage.id ? { ...m, hasCoachNote: true } : m
-    ));
-    
-    // Update session storage with the coach note flag
-    const currentSession = sessionStorage.getSession(sessionId);
-    if (currentSession) {
-      const updatedMessages = currentSession.messages.map(m =>
-        m.id === latestUserMessage.id ? { ...m, hasCoachNote: true } : m
-      );
-      sessionStorage.updateSession(sessionId, { messages: updatedMessages });
-    }
-    
-    // Update coach notes state
-    setCoachNotes(prev => [...prev, testNote]);
-    
-    // Don't auto-open panel - inline note will show
-    
-    console.log('🎯 TEST_COACH_NOTE_ADDED', testNote);
+    // Clear highlight after a moment
+    setTimeout(() => setHighlightedMessageId(null), 3000);
   };
 
   const calculateDuration = () => {
@@ -391,11 +349,7 @@ export function Conversation() {
       sessionId 
     });
     
-    // Handle live coaching for mock messages
-    if (session) {
-      console.log('🎯 TRIGGERING_LIVE_COACHING (MOCK)', { messageId: userMessage.id });
-      handleLiveCoaching(userMessage);
-    }
+    // No live coaching during conversation
     
     // Handle intake response for mock too
     if (session?.phase === 'intake') {
@@ -486,17 +440,17 @@ export function Conversation() {
                 </span>
               </div>
               
-              {/* Desktop coach toggle - secondary to inline notes */}
-              {coachNotes.length > 1 && (
+              {/* Key moments toggle - only shown after debrief */}
+              {session?.debriefComplete && session.keyMoments.length > 0 && (
                 <div className="hidden md:block">
                   <Button
-                    onClick={() => setIsCoachPanelOpen(!isCoachPanelOpen)}
-                    variant={isCoachPanelOpen ? 'default' : 'outline'}
+                    onClick={() => setShowKeyMoments(!showKeyMoments)}
+                    variant={showKeyMoments ? 'default' : 'outline'}
                     size="sm"
                     className="flex items-center gap-2"
                   >
-                    <MessageCircle className="w-4 h-4" />
-                    Coach History ({coachNotes.length})
+                    <Play className="w-4 h-4" />
+                    {session.keyMoments.length} key moments
                   </Button>
                 </div>
               )}
@@ -580,26 +534,21 @@ export function Conversation() {
                       </div>
                     </div>
                     
-                    {/* Inline coach note for user messages */}
-                    {message.role === 'user' && message.hasCoachNote && (() => {
-                      const coachNote = coachNotes.find(note => note.messageId === message.id);
-                      return coachNote ? (
+                    {/* Post-debrief annotation for user messages */}
+                    {message.role === 'user' && message.hasAnnotation && session?.debriefComplete && (() => {
+                      const annotation = session.annotations.find(a => a.messageId === message.id);
+                      return annotation ? (
                         <motion.div
                           initial={{ opacity: 0, y: 5 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: 0.2 }}
-                          className="ml-4 mr-[30%] mt-2"
+                          className={`ml-4 mr-[30%] mt-2 ${
+                            highlightedMessageId === message.id ? 'ring-2 ring-blue-300' : ''
+                          }`}
                         >
-                          <div className="bg-blue-50 border-l-4 border-blue-200 p-3 rounded-r-lg">
-                            <div className="flex items-start gap-2">
-                              <span className="text-blue-600 text-sm font-medium">Coach</span>
-                            </div>
-                            <p className="text-sm text-gray-700 mt-1 italic">"{coachNote.text}"</p>
-                            {coachNote.suggestion && (
-                              <p className="text-sm text-blue-700 mt-2">
-                                <span className="font-medium">Try:</span> "{coachNote.suggestion}"
-                              </p>
-                            )}
+                          <div className="bg-amber-50 border-l-4 border-amber-200 p-3 rounded-r-lg">
+                            <h4 className="text-amber-800 text-sm font-medium">{annotation.title}</h4>
+                            <p className="text-sm text-amber-700 mt-1">{annotation.body}</p>
                           </div>
                         </motion.div>
                       ) : null;
@@ -611,40 +560,79 @@ export function Conversation() {
             )}
           </div>
 
-          {/* Completion banner */}
+          {/* Post-debrief completion state */}
           {session?.status === 'completed' && (
-            <div className="border-t border-border bg-green-50 p-6">
+            <div className="border-t border-border bg-slate-50 p-6">
               <div className="max-w-md mx-auto text-center">
-                <div className="flex items-center justify-center gap-2 mb-4">
-                  <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-                    <span className="text-white text-sm">✓</span>
+                {!session.debriefComplete ? (
+                  <div className="flex items-center justify-center gap-2 mb-4">
+                    <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                      <span className="text-white text-sm">⏱</span>
+                    </div>
+                    <h3 className="text-lg font-medium">Finishing debrief...</h3>
                   </div>
-                  <h3 className="text-lg font-medium">Rehearsal Complete</h3>
-                </div>
-                
-                <div className="flex justify-center gap-6 mb-6 text-sm text-muted-foreground">
-                  <span>Duration: {calculateDuration()}</span>
-                  <span>Messages: {messages.length}</span>
-                </div>
-                
-                <div className="flex gap-3">
-                  <Button
-                    onClick={handleViewDebrief}
-                    variant="default"
-                    size="sm"
-                    className="flex-1"
-                  >
-                    View Debrief
-                  </Button>
-                  <Button
-                    onClick={handlePracticeAgain}
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                  >
-                    Practice Again
-                  </Button>
-                </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-center gap-2 mb-4">
+                      <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-sm">✓</span>
+                      </div>
+                      <h3 className="text-lg font-medium">Rehearsal Complete</h3>
+                    </div>
+                    
+                    {session.keyMoments.length > 0 && (
+                      <div className="mb-6">
+                        <p className="text-sm text-slate-600 mb-3">
+                          {session.keyMoments.length} key moments from this rehearsal
+                        </p>
+                        <div className="space-y-2">
+                          {session.keyMoments.map((moment) => (
+                            <button
+                              key={moment.id}
+                              onClick={() => handleScrollToMoment(moment.messageId)}
+                              className="block w-full text-left p-2 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition-colors"
+                            >
+                              <div className="font-medium text-sm text-slate-800">{moment.label}</div>
+                              <div className="text-xs text-slate-600">{moment.summary}</div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="flex flex-col gap-3">
+                      <Button
+                        onClick={handleRunItAgain}
+                        variant="default"
+                        size="sm"
+                        className="w-full bg-blue-600 hover:bg-blue-700"
+                      >
+                        Run it again
+                      </Button>
+                      
+                      <div className="flex gap-3">
+                        {session.keyMoments.length > 0 && (
+                          <Button
+                            onClick={() => setShowKeyMoments(!showKeyMoments)}
+                            variant="outline"
+                            size="sm"
+                            className="flex-1"
+                          >
+                            Review moments
+                          </Button>
+                        )}
+                        <Button
+                          onClick={handleBackHome}
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                        >
+                          Back home
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -679,15 +667,15 @@ export function Conversation() {
                 >
                   Mock: Transparent
                 </Button>
-                {/* Debug test coach note button - dev only */}
+                {/* Dev-only test for annotations */}
                 {import.meta.env.DEV && (
                   <Button
                     size="sm"
-                    variant="destructive"
-                    onClick={handleAddTestCoachNote}
-                    className="bg-red-600 hover:bg-red-700"
+                    variant="secondary"
+                    onClick={generateAnnotations}
+                    className="bg-purple-600 hover:bg-purple-700 text-white"
                   >
-                    🧪 Add Test Coach Note
+                    🧪 Test Annotations
                   </Button>
                 )}
               </div>
@@ -695,20 +683,7 @@ export function Conversation() {
           )}
         </div>
 
-        {/* Coach Panel */}
-        <CoachPanel
-          isOpen={isCoachPanelOpen}
-          onToggle={() => setIsCoachPanelOpen(!isCoachPanelOpen)}
-          latestNote={coachNotes.length > 0 ? coachNotes[coachNotes.length - 1] : null}
-          allNotes={coachNotes}
-          onNoteClick={(messageId) => {
-            setHighlightedMessageId(messageId);
-            // Scroll to message
-            const messageElement = document.getElementById(`message-${messageId}`);
-            messageElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }}
-          isConversationActive={isSessionActive}
-        />
+        {/* Old coach panel removed - replaced with post-debrief annotations */}
       </div>
     </div>
   );

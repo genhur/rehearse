@@ -10,7 +10,26 @@ export interface Message {
     valence: number;
     arousal: number;
   };
-  hasCoachNote?: boolean;
+  hasAnnotation?: boolean;
+}
+
+export interface Annotation {
+  id: string;
+  messageId: string;
+  sessionId: string;
+  title: string;
+  body: string;
+  type: 'vague_answer' | 'strong_ownership' | 'avoided_question' | 'stayed_calm' | 
+        'missed_acknowledgment' | 'clear_ask' | 'good_boundary' | 'strong_moment' | 'premature_problem_solving';
+  createdAt: number;
+}
+
+export interface KeyMoment {
+  id: string;
+  annotationId: string;
+  messageId: string;
+  label: string;
+  summary: string;
 }
 
 export interface Session {
@@ -22,7 +41,10 @@ export interface Session {
   createdAt: number;
   status: 'active' | 'completed';
   phase: 'intake' | 'roleplay';
+  debriefComplete: boolean;
   messages: Message[];
+  annotations: Annotation[];
+  keyMoments: KeyMoment[];
 }
 
 class SessionStorage {
@@ -66,7 +88,10 @@ class SessionStorage {
       createdAt: Date.now(),
       status: 'active',
       phase: 'roleplay', // default phase
-      messages: []
+      debriefComplete: false,
+      messages: [],
+      annotations: [],
+      keyMoments: []
     };
 
     this.sessions.set(session.id, session);
@@ -120,6 +145,61 @@ class SessionStorage {
   getMessages(sessionId: string): Message[] {
     const session = this.sessions.get(sessionId);
     return session ? session.messages : [];
+  }
+
+  addAnnotation(sessionId: string, messageId: string, title: string, body: string, type: Annotation['type']): Annotation {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      throw new Error(`Session ${sessionId} not found`);
+    }
+
+    const annotation: Annotation = {
+      id: `annotation_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      messageId,
+      sessionId,
+      title,
+      body,
+      type,
+      createdAt: Date.now()
+    };
+
+    session.annotations.push(annotation);
+    
+    // Mark message as having annotation
+    const message = session.messages.find(m => m.id === messageId);
+    if (message) {
+      message.hasAnnotation = true;
+    }
+    
+    this.saveToStorage();
+    return annotation;
+  }
+
+  addKeyMoment(sessionId: string, annotationId: string, messageId: string, label: string, summary: string): KeyMoment {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      throw new Error(`Session ${sessionId} not found`);
+    }
+
+    const keyMoment: KeyMoment = {
+      id: `moment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      annotationId,
+      messageId,
+      label,
+      summary
+    };
+
+    session.keyMoments.push(keyMoment);
+    this.saveToStorage();
+    return keyMoment;
+  }
+
+  markDebriefComplete(sessionId: string): void {
+    const session = this.sessions.get(sessionId);
+    if (session) {
+      session.debriefComplete = true;
+      this.saveToStorage();
+    }
   }
 }
 

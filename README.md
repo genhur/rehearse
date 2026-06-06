@@ -1,3 +1,6 @@
+WIP / Functional prototype only
+
+
 # Rehearse
 
 Rehearse is a voice AI that helps people prepare for difficult conversations before they happen.

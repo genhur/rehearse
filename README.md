@@ -9,7 +9,7 @@ Describe a conversation you're avoiding, practice it with an AI simulation, revi
 
 The idea came from a simple observation: most difficult conversations are rehearsed in our heads, but very few are ever practiced out loud.
 
-Whether you're telling a cofounder that runway is running out, asking your manager for a promotion, setting a boundary with a loved one, or delivering difficult feedback to a teammate, the stakes often feel high because you only get one real attempt.
+Whether you're asking your manager for a promotion, setting a boundary with a loved one, or delivering difficult news to a teammate, the stakes often feel high because you only get one real attempt.
 
 Rehearse gives people a chance to practice first.
 

@@ -742,7 +742,7 @@ export function Conversation() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col" style={{ '--header-height': '89px' } as React.CSSProperties}>
       {/* Header */}
       <div className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-full mx-auto px-6 py-4">
@@ -972,6 +972,17 @@ export function Conversation() {
                         className="bg-green-600 hover:bg-green-700 text-white"
                       >
                         🧪 Test Feedback
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          setIsFeedbackOpen(!isFeedbackOpen);
+                          console.log('🧪 TOGGLING_FEEDBACK_RAIL', { isOpen: !isFeedbackOpen });
+                        }}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                      >
+                        🧪 Toggle Rail
                       </Button>
                       <Button
                         size="sm"

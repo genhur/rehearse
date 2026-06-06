@@ -1,4 +1,5 @@
 import { motion, AnimatePresence } from 'motion/react';
+import { useEffect, useRef } from 'react';
 import { Button } from './Button';
 import { X, ExternalLink, Play, Mic } from 'lucide-react';
 import type { FeedbackReport, AudioAnalysis } from '../../../lib/sessions';
@@ -20,6 +21,20 @@ export function FeedbackRail({
   onJumpToMoment,
   onRunAgain,
 }: FeedbackRailProps) {
+  const feedbackRailRef = useRef<HTMLDivElement>(null);
+  
+  // Reset scroll position when rail opens
+  useEffect(() => {
+    if (isOpen && feedbackRailRef.current) {
+      // Use a small delay to ensure the rail has fully rendered
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          feedbackRailRef.current?.scrollTo({ top: 0, behavior: 'instant' });
+        });
+      });
+    }
+  }, [isOpen]);
+
   const handleJumpToMoment = () => {
     if (report.replayMoment.turnId && onJumpToMoment) {
       onJumpToMoment(report.replayMoment.turnId);
@@ -34,10 +49,14 @@ export function FeedbackRail({
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: '100%', opacity: 0 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="w-full h-full bg-background border-l border-border flex flex-col"
+          className="w-full bg-background border-l border-border flex flex-col sticky"
+          style={{ 
+            height: 'calc(100vh - var(--header-height, 89px))',
+            top: 'var(--header-height, 89px)'
+          }}
         >
-          {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-border bg-card/30">
+          {/* Fixed Header */}
+          <div className="flex items-center justify-between p-6 border-b border-border bg-card/30 flex-shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center">
                 <Mic className="w-4 h-4 text-white" />
@@ -54,8 +73,12 @@ export function FeedbackRail({
             </Button>
           </div>
 
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto">
+          {/* Scrollable Content */}
+          <div 
+            ref={feedbackRailRef}
+            className="flex-1 overflow-y-auto overscroll-contain"
+            style={{ scrollbarGutter: 'stable' }}
+          >
             <div className="p-6 space-y-8">
               {/* Overall Assessment */}
               <div>
@@ -174,9 +197,9 @@ export function FeedbackRail({
             </div>
           </div>
 
-          {/* Footer with Run it again */}
+          {/* Fixed Footer with Run it again */}
           {onRunAgain && (
-            <div className="border-t border-border p-6 bg-card/30">
+            <div className="border-t border-border p-6 bg-card/30 flex-shrink-0">
               <Button 
                 onClick={onRunAgain} 
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white"

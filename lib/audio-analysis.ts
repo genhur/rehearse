@@ -145,10 +145,17 @@ export class AudioAnalysisService {
     audioAnalysis: AudioAnalysis | null,
     scenario: string
   ): Promise<FeedbackReport | null> {
+    console.log('🔍 FEEDBACK_GENERATION_AUDIT', {
+      messageCount: messages.length,
+      messages: messages.map(m => ({ id: m.id, role: m.role, text: m.text })),
+      scenario,
+      hasAudioAnalysis: !!audioAnalysis
+    });
+    
     const openaiApiKey = import.meta.env.VITE_OPENAI_API_KEY;
     
     if (!openaiApiKey) {
-      console.warn('🎤 OPENAI_API_KEY_NOT_CONFIGURED');
+      console.warn('🎤 OPENAI_API_KEY_NOT_CONFIGURED - Using mock feedback');
       return this.createMockFeedback(messages, audioAnalysis);
     }
 
@@ -162,29 +169,38 @@ export class AudioAnalysisService {
 
       const systemPrompt = `You are a communication coach analyzing a rehearsal conversation. The user practiced a difficult conversation scenario.
 
+CRITICAL REQUIREMENTS:
+1. Only analyze if there are at least 3 user turns AND at least 100 words spoken by the user
+2. Every feedback claim MUST be grounded in specific transcript evidence
+3. Quote exact text from the transcript to support your observations
+4. Reference specific turn IDs when making claims
+
 You have access to:
 1. The full transcript with turn IDs (shown as [ID: xyz])
 2. Audio analysis showing the user's vocal delivery patterns
 
-Generate feedback that helps the user understand both WHAT they communicated and HOW they came across.
+If insufficient data (less than 3 user turns or less than 100 user words):
+Return: {"overallAssessment": "Not enough conversation data to generate meaningful coaching feedback. Continue the simulation or try another rehearsal.", "howYouCameAcross": "Insufficient conversation data for analysis.", "whatWorked": [], "opportunities": ["Have a longer conversation to enable coaching feedback"], "replayMoment": {"turnId": null, "originalMoment": "No sufficient user participation to analyze.", "howYouLikelySounded": "Unable to analyze - insufficient data.", "howItMayHaveLanded": "Unable to analyze - insufficient data.", "strongerVersion": "Continue the conversation to get meaningful feedback.", "deliveryTip": "Practice more to generate evidence-based coaching."}}
 
-Focus on how the user likely sounded to the other person, not just the content of their words.
-
-For the replayMoment, identify a specific user turn from the transcript that would benefit from improvement. Use the exact turn ID from the transcript (the ID shown in brackets).
+For sufficient data, generate feedback that:
+- References specific quotes from user messages
+- Connects observations to exact turn IDs  
+- Avoids generic claims not supported by evidence
+- Focuses on what actually happened in the conversation
 
 Response format (JSON):
 {
-  "overallAssessment": "2-3 sentence summary of their communication",
-  "howYouCameAcross": "How you likely felt to the other person (e.g., 'Calm and thoughtful', 'Direct but guarded')",
-  "whatWorked": ["strength 1", "strength 2", "strength 3"],
-  "opportunities": ["improvement 1", "improvement 2", "improvement 3"],
+  "overallAssessment": "Evidence-based summary citing specific user responses and turn count",
+  "howYouCameAcross": "Based on specific language choices (quote examples)",
+  "whatWorked": ["Evidence-based strength with quote: 'exact text from turn ID xyz'", "..."],
+  "opportunities": ["Evidence-based improvement with quote: 'instead of saying X in turn Y, try Z'", "..."],
   "replayMoment": {
-    "turnId": "exact ID of the user turn from the transcript (if applicable)",
-    "originalMoment": "quote from transcript",
-    "howYouLikelySounded": "how this moment likely sounded",
-    "howItMayHaveLanded": "how the other person likely received it",
-    "strongerVersion": "improved version of what to say",
-    "deliveryTip": "specific advice on HOW to deliver it"
+    "turnId": "exact ID of the user turn from the transcript",
+    "originalMoment": "exact quote from transcript",
+    "howYouLikelySounded": "analysis based on the specific words used",
+    "howItMayHaveLanded": "how this specific message likely affected the conversation",
+    "strongerVersion": "improved version of the exact quote",
+    "deliveryTip": "specific advice for this particular response"
   }
 }`;
 
@@ -197,6 +213,19 @@ Audio Analysis:
 ${audioAnalysis ? `Primary emotion detected: ${audioAnalysis.primaryEmotion} (${Math.round(audioAnalysis.confidence * 100)}% confidence)` : 'No audio analysis available'}
 
 Analyze this rehearsal focusing on both content and delivery. Help the user understand how they came across.`;
+
+      const userMessages = messages.filter(m => m.role === 'user');
+      const totalUserWords = userMessages.reduce((count, msg) => 
+        count + msg.text.split(/\s+/).filter(word => word.length > 0).length, 0);
+      
+      console.log('🔍 OPENAI_REQUEST_AUDIT', {
+        systemPrompt,
+        userPrompt,
+        transcriptLength: transcript.length,
+        userTurnCount: userMessages.length,
+        totalUserWords,
+        meetsDataRequirements: userMessages.length >= 3 && totalUserWords >= 100
+      });
 
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -222,6 +251,11 @@ Analyze this rehearsal focusing on both content and delivery. Help the user unde
       const result = await response.json();
       const feedback = JSON.parse(result.choices[0].message.content);
 
+      console.log('🔍 OPENAI_RESPONSE_AUDIT', {
+        rawResponse: result.choices[0].message.content,
+        parsedFeedback: feedback
+      });
+      
       console.log('🎤 FEEDBACK_REPORT_GENERATED', feedback);
       return feedback;
 
@@ -237,27 +271,128 @@ Analyze this rehearsal focusing on both content and delivery. Help the user unde
   }
 
   private createMockFeedback(messages: Message[], audioAnalysis: AudioAnalysis | null): FeedbackReport {
+    console.log('🔍 MOCK_FEEDBACK_AUDIT', {
+      messageCount: messages.length,
+      userTurnCount: messages.filter(m => m.role === 'user').length,
+      messages: messages.map(m => ({ id: m.id, role: m.role, text: m.text }))
+    });
+    
+    const userMessages = messages.filter(m => m.role === 'user');
+    const totalUserWords = userMessages.reduce((count, msg) => {
+      return count + msg.text.split(/\s+/).filter(word => word.length > 0).length;
+    }, 0);
+    
+    // Check for insufficient data
+    if (userMessages.length < 3 || totalUserWords < 100) {
+      console.log('🔍 MOCK_FEEDBACK: Insufficient data detected', {
+        userMessageCount: userMessages.length,
+        totalUserWords,
+        threshold: { minMessages: 3, minWords: 100 }
+      });
+      
+      return {
+        overallAssessment: "Not enough conversation data to generate meaningful coaching feedback. Continue the simulation or try another rehearsal.",
+        howYouCameAcross: "Insufficient conversation data for analysis.",
+        whatWorked: [],
+        opportunities: ["Have a longer conversation to enable coaching feedback"],
+        replayMoment: {
+          turnId: null,
+          originalMoment: "No sufficient user participation to analyze.",
+          howYouLikelySounded: "Unable to analyze - insufficient data.",
+          howItMayHaveLanded: "Unable to analyze - insufficient data.",
+          strongerVersion: "Continue the conversation to get meaningful feedback.",
+          deliveryTip: "Practice more to generate evidence-based coaching."
+        }
+      };
+    }
+    
+    // Generate evidence-based mock feedback for sufficient data
+    const strengths = this.analyzeStrengths(userMessages);
+    const opportunities = this.analyzeOpportunities(userMessages);
+    const longestResponse = userMessages.reduce((longest, current) => 
+      current.text.length > longest.text.length ? current : longest
+    );
+    
     return {
-      overallAssessment: "You communicated the key points clearly and maintained a professional tone throughout the conversation. When challenged, you showed some hesitation but ultimately provided the necessary information.",
-      howYouCameAcross: audioAnalysis ? `${audioAnalysis.primaryEmotion} and measured` : "Thoughtful and composed",
-      whatWorked: [
-        "You acknowledged their concerns directly",
-        "You provided specific information when asked", 
-        "You maintained a collaborative tone"
-      ],
-      opportunities: [
-        "Practice leading with confidence rather than hesitation",
-        "Use more decisive language when presenting plans",
-        "Pause before responding to show you're considering their perspective"
-      ],
+      overallAssessment: `You participated in ${userMessages.length} exchanges with ${totalUserWords} total words. Based on your responses, you engaged with the conversation scenario.`,
+      howYouCameAcross: audioAnalysis ? 
+        `${audioAnalysis.primaryEmotion} and measured based on vocal analysis` : 
+        this.analyzeToneFromText(userMessages),
+      whatWorked: strengths.slice(0, 3),
+      opportunities: opportunities.slice(0, 3),
       replayMoment: {
-        originalMoment: messages.length > 0 ? messages[Math.floor(messages.length / 2)]?.text || "Sample response" : "Sample response",
-        howYouLikelySounded: audioAnalysis ? `${audioAnalysis.primaryEmotion} and slightly uncertain` : "Uncertain and apologetic",
-        howItMayHaveLanded: "It may have weakened confidence in your plan",
-        strongerVersion: "I understand your concern. Let me walk you through our approach and the reasoning behind it.",
-        deliveryTip: "Speak more slowly and pause briefly before delivering your key message"
+        turnId: longestResponse.id,
+        originalMoment: longestResponse.text,
+        howYouLikelySounded: audioAnalysis ? 
+          `${audioAnalysis.primaryEmotion} based on vocal analysis` : 
+          "Based on your word choice, this likely came across as your main contribution",
+        howItMayHaveLanded: "This represented your primary engagement with the conversation",
+        strongerVersion: longestResponse.text + " What are your thoughts on this approach?",
+        deliveryTip: "Consider building on substantial responses like this with follow-up questions"
       }
     };
+  }
+
+  private analyzeStrengths(userMessages: Message[]): string[] {
+    const strengths = [];
+    
+    for (const msg of userMessages) {
+      const text = msg.text.toLowerCase();
+      
+      if (text.includes('i understand') || text.includes('i see') || text.includes('that makes sense')) {
+        strengths.push(`You acknowledged their perspective: "${msg.text.substring(0, 50)}..."`);
+      }
+      
+      if (text.includes('what') && text.includes('?') || text.includes('how') && text.includes('?')) {
+        strengths.push(`You asked clarifying questions: "${msg.text}"`);
+      }
+      
+      if (text.includes('my mistake') || text.includes('i should have') || text.includes('i was wrong')) {
+        strengths.push(`You took ownership: "${msg.text}"`);
+      }
+      
+      if (text.includes('we could') || text.includes('what if') || text.includes('let\'s')) {
+        strengths.push(`You proposed solutions: "${msg.text}"`);
+      }
+    }
+    
+    return strengths.length > 0 ? strengths : [`You participated with ${userMessages.length} responses`];
+  }
+
+  private analyzeOpportunities(userMessages: Message[]): string[] {
+    const opportunities = [];
+    
+    for (const msg of userMessages) {
+      const text = msg.text.toLowerCase();
+      
+      if (text.includes('but') || text.includes('however') || text.includes('actually')) {
+        opportunities.push(`Consider removing defensive language from: "${msg.text.substring(0, 30)}..."`);
+      }
+      
+      if (text.includes('maybe') || text.includes('i think') || text.includes('probably')) {
+        opportunities.push(`Use more confident language instead of: "${msg.text}"`);
+      }
+      
+      if (msg.text.split(' ').length < 5) {
+        opportunities.push(`Expand on brief responses like: "${msg.text}"`);
+      }
+    }
+    
+    return opportunities.length > 0 ? opportunities : ['Practice longer, more detailed responses'];
+  }
+
+  private analyzeToneFromText(userMessages: Message[]): string {
+    const allText = userMessages.map(msg => msg.text.toLowerCase()).join(' ');
+    
+    if (allText.includes('sorry') || allText.includes('apologize')) {
+      return "Apologetic and accommodating based on your language choices";
+    } else if (allText.includes('definitely') || allText.includes('absolutely')) {
+      return "Confident and direct based on your word choices";
+    } else if (allText.includes('maybe') || allText.includes('perhaps')) {
+      return "Tentative and thoughtful based on uncertain language";
+    }
+    
+    return "Measured and thoughtful in your communication approach";
   }
 }
 

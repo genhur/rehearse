@@ -1,5 +1,5 @@
 import { Button } from './Button';
-import { ArrowLeft, History, Circle, Home } from 'lucide-react';
+import { ArrowLeft, History, Circle, Home, PhoneOff } from 'lucide-react';
 import { useNavigate } from 'react-router';
 
 interface AppHeaderProps {
@@ -9,6 +9,8 @@ interface AppHeaderProps {
   showHistoryButton?: boolean;
   status?: 'active' | 'complete' | 'idle';
   onHistoryClick?: () => void;
+  showEndCall?: boolean;
+  onEndCall?: () => void;
 }
 
 export function AppHeader({ 
@@ -17,7 +19,9 @@ export function AppHeader({
   showHomeButton = true,
   showHistoryButton = true, 
   status,
-  onHistoryClick 
+  onHistoryClick,
+  showEndCall = false,
+  onEndCall
 }: AppHeaderProps) {
   const navigate = useNavigate();
 
@@ -97,6 +101,21 @@ export function AppHeader({
                 {getStatusIndicator()}
                 <span>{getStatusLabel()}</span>
               </div>
+            )}
+            
+            {showEndCall && (
+              <Button
+                onClick={() => {
+                  console.log("AppHeader: End call button clicked");
+                  onEndCall?.();
+                }}
+                variant="destructive"
+                size="sm"
+                className="flex items-center gap-2"
+              >
+                <PhoneOff className="w-4 h-4" />
+                End call
+              </Button>
             )}
           </div>
         </div>

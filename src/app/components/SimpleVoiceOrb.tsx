@@ -2,6 +2,8 @@ import { motion, AnimatePresence } from 'motion/react';
 
 interface SimpleVoiceOrbProps {
   state: 'idle' | 'listening' | 'thinking' | 'speaking';
+  onClick?: () => void;
+  clickable?: boolean;
 }
 
 function Ring({
@@ -35,7 +37,7 @@ function Ring({
   );
 }
 
-export function SimpleVoiceOrb({ state }: SimpleVoiceOrbProps) {
+export function SimpleVoiceOrb({ state, onClick, clickable = false }: SimpleVoiceOrbProps) {
   const isListening = state === 'listening';
   const isSpeaking = state === 'speaking';
   const isThinking = state === 'thinking';
@@ -137,8 +139,11 @@ export function SimpleVoiceOrb({ state }: SimpleVoiceOrbProps) {
 
         {/* The orb itself */}
         <motion.div
-          className="relative rounded-full"
+          className={`relative rounded-full ${clickable ? 'cursor-pointer' : ''}`}
           style={{ width: 80, height: 80, zIndex: 1, flexShrink: 0 }}
+          onClick={clickable ? onClick : undefined}
+          whileHover={clickable && state === 'idle' ? { scale: 1.05 } : {}}
+          whileTap={clickable ? { scale: 0.95 } : {}}
           animate={
             isListening
               ? { scale: [1, 1.045, 0.98, 1.045, 1] }

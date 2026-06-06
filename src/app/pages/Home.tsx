@@ -2,7 +2,7 @@ import { motion } from 'motion/react';
 import { useNavigate, useOutletContext } from 'react-router';
 import { VoiceOrb } from '../components/VoiceOrb';
 import { AppHeader } from '../components/AppHeader';
-import { createSetupConversation } from '../../../lib/sessions';
+import { createSession, createSetupConversation } from '../../../lib/sessions';
 
 interface OutletContext {
   openHistoryPanel: () => void;
@@ -32,18 +32,15 @@ export function Home() {
   };
 
   const handleStartNewRehearsal = () => {
-    console.log('HOME_CIRCLE_CLICKED');
-    
-    // Create a setup conversation for intake
+    // Create a setup conversation for intake, not a persisted session
     const setupConversation = createSetupConversation(
       'What difficult conversation are you avoiding today?'
     );
-    console.log('SETUP_CREATED_HOME', setupConversation);
     
-    // Navigate to conversation with setup ID
-    const route = `/conversation/setup/${setupConversation.id}`;
-    console.log('NAVIGATING_TO_HOME', route);
-    navigate(route);
+    console.log('SETUP_CREATED_FROM_VOICE_ORB', setupConversation);
+    
+    // Navigate to setup conversation
+    navigate(`/conversation/setup/${setupConversation.id}`);
   };
 
   return (

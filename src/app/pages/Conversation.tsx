@@ -4,7 +4,7 @@ import { useNavigate, useParams, useOutletContext } from 'react-router';
 import { Button } from '../components/Button';
 import { AppHeader } from '../components/AppHeader';
 import { FeedbackRail } from '../components/FeedbackRail';
-import { getSession, updateSession, sessionManager, getCurrentAttempt, getSetupConversation, updateSetupConversation, commitSetupToSession, type RehearsalSession, type RehearsalAttempt, type SetupConversation, type TranscriptTurn, type AudioAnalysis, type FeedbackReport } from '../../../lib/sessions';
+import { getSession, updateSession, sessionManager, getCurrentAttempt, getSetupConversation, updateSetupConversation, commitSetupToSession, endCurrentAttempt as endSessionAttempt, type RehearsalSession, type RehearsalAttempt, type SetupConversation, type TranscriptTurn, type AudioAnalysis, type FeedbackReport, type RehearsalPhase } from '../../../lib/sessions';
 import { SimpleVoiceOrb } from '../components/SimpleVoiceOrb';
 import { Conversation as ElevenLabsConversation } from '@11labs/client';
 import type { Mode, Status } from '@11labs/client';
@@ -22,8 +22,11 @@ interface OutletContext {
 
 export function Conversation() {
   const navigate = useNavigate();
-  const { sessionId, setupId } = useParams<{ sessionId?: string; setupId?: string }>();
+  const params = useParams<{ sessionId?: string; setupId?: string }>();
+  const { sessionId, setupId } = params;
   const { openHistoryPanel } = useOutletContext<OutletContext>();
+  
+  console.log('🚀 SETUP: Conversation component params', { params, sessionId, setupId });
   const [session, setSession] = useState<RehearsalSession | null>(null);
   const [setupConversation, setSetupConversation] = useState<SetupConversation | null>(null);
   const [currentAttempt, setCurrentAttempt] = useState<RehearsalAttempt | null>(null);
@@ -38,24 +41,17 @@ export function Conversation() {
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const conversationRef = useRef<ElevenLabsConversation | null>(null);
+  const inactivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Helper to determine if a call is currently active
-  const isCallActive = (): boolean => {
-    // Setup conversations are never "active calls"
-    if (setupConversation) return false;
-    
-    const currentAttemptData = getCurrentAttempt(session);
-    return session?.status === 'active' && 
-           currentAttemptData?.status === 'active';
-  };
 
   useEffect(() => {
-    console.log('CONVERSATION_PAGE_MOUNTED', { sessionId, setupId });
+    console.log('🚀 SETUP: CONVERSATION_PAGE_MOUNTED', { sessionId, setupId });
     
     // Handle setup conversation
     if (setupId) {
       const setupData = getSetupConversation(setupId);
       if (!setupData) {
+        console.trace('NAVIGATE_HOME_CALLED: Setup conversation not found');
         navigate('/');
         return;
       }
@@ -86,15 +82,28 @@ export function Conversation() {
 
     // Handle regular session
     if (!sessionId) {
+      console.log('🚀 SETUP: No sessionId, redirecting to home');
+      console.trace('NAVIGATE_HOME_CALLED: No sessionId in useEffect');
       navigate('/');
       return;
     }
 
+    console.log('🚀 SETUP: Loading session', { sessionId });
+    
     const sessionData = getSession(sessionId);
     if (!sessionData) {
+      console.error('🚀 SETUP: Session not found, redirecting to home', { sessionId });
+      // Don't navigate if we're in the middle of completion
+      if (window.location.pathname.includes('/conversation/')) {
+        console.log('🚀 SETUP: In conversation page, not navigating away');
+        return;
+      }
+      console.trace('NAVIGATE_HOME_CALLED: Session not found in useEffect');
       navigate('/');
       return;
     }
+
+    console.log('🚀 SETUP: Session found', { sessionData });
 
     setSession(sessionData);
     setSetupConversation(null);
@@ -103,6 +112,36 @@ export function Conversation() {
     const currentAttemptData = getCurrentAttempt(sessionData);
     setCurrentAttempt(currentAttemptData);
     setTranscript(currentAttemptData ? currentAttemptData.transcript : []);
+    
+    console.log('🚀 SETUP: Session state set', { 
+      phase: sessionData.phase, 
+      status: sessionData.status,
+      currentAttempt: currentAttemptData 
+    });
+    
+    // Initialize isSessionActive for simulation sessions with active status
+    if (sessionData.phase === 'simulation' && 
+        (sessionData.status === 'active' || currentAttemptData?.status === 'active')) {
+      console.log('🚀 SETUP: Setting isSessionActive=true for active simulation session');
+      setIsSessionActive(true);
+      
+      // If session has existing transcript, don't auto-start conversation
+      if (currentAttemptData?.transcript && currentAttemptData.transcript.length > 0) {
+        console.log('🚀 SETUP: Session has existing transcript, not auto-starting');
+        setConversationState('idle'); // Set to idle since conversation is not currently active
+      }
+    }
+    
+    // Auto-start simulation phase sessions that don't have transcript yet
+    if (sessionData.phase === 'simulation' && 
+        currentAttemptData?.status === 'active' &&
+        (!currentAttemptData.transcript || currentAttemptData.transcript.length === 0)) {
+      console.log('🚀 SETUP: Auto-starting simulation phase session');
+      setTimeout(() => {
+        console.log('🚀 SETUP: Auto-start timeout complete, calling handleStartConversation');
+        handleStartConversation();
+      }, 500);
+    }
   }, [sessionId, setupId, navigate]);
 
   useEffect(() => {
@@ -110,49 +149,151 @@ export function Conversation() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [transcript]);
 
+  useEffect(() => {
+    // Cleanup timeout on unmount
+    return () => {
+      clearInactivityTimeout();
+    };
+  }, []);
+
   const handleStartConversation = async () => {
-    if (!sessionId) return;
+    console.log("VOICE: orb clicked", { sessionId, setupId, mode: sessionId ? 'simulation' : 'setup' });
     
+    // Support both regular sessions and setup conversations
+    if (!sessionId && !setupId) {
+      console.error("VOICE: No sessionId or setupId, cannot start");
+      return;
+    }
+    
+    console.log("VOICE: setting UI to active state");
     setIsSessionActive(true);
-    setConversationState('listening');
     
+    // Don't set to listening until we verify mic access
+    setConversationState('thinking');
+    console.log("VOICE: initial state set to thinking, will change to listening after mic verification");
+    
+    // Start inactivity timeout
+    startInactivityTimeout();
+    
+    console.log("MIC_PERMISSION_REQUESTED");
+    
+    // Check microphone permissions first
+    try {
+      const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+      console.log("VOICE: microphone permission status", permissionStatus.state);
+      
+      if (permissionStatus.state === 'granted') {
+        console.log("MIC_PERMISSION_GRANTED");
+      } else if (permissionStatus.state === 'denied') {
+        console.log("MIC_PERMISSION_DENIED");
+      }
+    } catch (permError) {
+      console.warn("VOICE: could not check microphone permission", permError);
+    }
+    
+    // Test getUserMedia directly
+    try {
+      console.log("VOICE: testing getUserMedia access");
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      console.log("VOICE: getUserMedia successful", { tracks: stream.getAudioTracks().length });
+      
+      // Check if tracks are active
+      stream.getAudioTracks().forEach((track, index) => {
+        console.log(`VOICE: audio track ${index}`, { 
+          enabled: track.enabled, 
+          readyState: track.readyState,
+          label: track.label 
+        });
+      });
+      
+      // Clean up test stream
+      stream.getTracks().forEach(track => track.stop());
+      console.log("VOICE: getUserMedia test stream cleaned up");
+      
+    } catch (getUserMediaError) {
+      console.error("USER_AUDIO_INPUT_ERROR: getUserMedia failed", getUserMediaError);
+      console.error("MIC_PERMISSION_DENIED: getUserMedia access denied");
+    }
+    
+    console.log("VOICE: starting audio recording service");
     // Start audio recording
     const recordingStarted = await audioRecordingService.startRecording();
     if (recordingStarted) {
       setIsRecording(true);
+      console.log("VOICE: audio recording started successfully");
+    } else {
+      console.error("VOICE: audio recording failed to start");
     }
     
     try {
+      console.log("VOICE: starting ElevenLabs session", { agentId: AGENT_ID, mode: sessionId ? 'simulation' : 'setup' });
+      
       const conversation = await ElevenLabsConversation.startSession({
         agentId: AGENT_ID,
         onConnect: () => {
-          console.log('[Conversation] ElevenLabs connected');
+          console.log('ELEVENLABS_SESSION_STARTED');
+          console.log('VOICE: ElevenLabs connected successfully');
         },
         onDisconnect: () => {
-          console.log('[Conversation] ElevenLabs disconnected');
+          console.log('VOICE: ElevenLabs disconnected');
           conversationRef.current = null;
           setIsSessionActive(false);
           setConversationState('idle');
         },
         onError: (message) => {
-          console.error('[Conversation] ElevenLabs error:', message);
+          console.error('VOICE: ElevenLabs error:', message);
+          console.error('USER_AUDIO_INPUT_ERROR: ElevenLabs session error', message);
           setIsSessionActive(false);
           setConversationState('idle');
         },
         onModeChange: ({ mode }) => {
+          console.log('VOICE: ElevenLabs mode changed to', mode);
+          
+          // Log specifically when entering listening mode (mic should be active)
+          if (mode === 'listening') {
+            console.log('VOICE: ElevenLabs confirms listening mode - mic input should be active');
+            console.log('VOICE: setting UI to listening state');
+          } else if (mode === 'speaking') {
+            console.log('VOICE: ElevenLabs speaking - mic input temporarily disabled');
+          }
+          
           setElevenLabsMode(mode);
           setConversationState(mode === 'listening' ? 'listening' : mode === 'speaking' ? 'speaking' : 'thinking');
         },
         onMessage: ({ message, source }) => {
+          console.log('VOICE: message received', { message, source, messageLength: message.length });
+          
+          if (source === 'user') {
+            console.log('USER_TRANSCRIPT_EVENT: user spoke', message);
+            console.log('VOICE: user transcript:', message);
+          } else {
+            console.log('VOICE: agent response:', message);
+          }
+          // Reset inactivity timeout on any message
+          startInactivityTimeout();
+          
           // Add transcript turn to session storage
           const speaker = source === 'user' ? 'user' : 'agent';
-          const newTurn = sessionManager.addTranscriptTurn(sessionId, speaker, message);
+          
+          let newTurn;
+          if (sessionId) {
+            console.log('VOICE: adding transcript to session', { sessionId, speaker });
+            newTurn = sessionManager.addTranscriptTurn(sessionId, speaker, message);
+          } else if (setupId) {
+            console.log('VOICE: adding transcript to setup conversation', { setupId, speaker });
+            newTurn = sessionManager.addSetupTranscriptTurn(setupId, speaker, message);
+          } else {
+            console.error('VOICE: no sessionId or setupId to add transcript to');
+            return;
+          }
+          
           setTranscript(prev => [...prev, newTurn]);
-          console.log('📝 TRANSCRIPT_TURN_ADDED', { 
+          console.log('VOICE: transcript turn added', { 
             speaker, 
             turnId: newTurn.id, 
             text: message,
-            sessionId 
+            sessionId,
+            setupId
           });
           
           // Check for user decline phrases
@@ -160,25 +301,61 @@ export function Conversation() {
             checkForUserDecline(message);
           }
           
+          // Natural ending detection removed - users control via End Call button
+          
+          // Check for user readiness to start simulation in setup conversations
+          if (speaker === 'user' && setupConversation) {
+            checkForSimulationReadiness(message);
+          }
+          
           // No live coaching during active conversation
           
-          // Handle intake flow progression
-          if (speaker === 'user' && (
-            (session?.scenario === 'What difficult conversation are you avoiding today?') ||
-            (setupConversation?.scenarioDraft === 'What difficult conversation are you avoiding today?')
-          )) {
+          // Handle intake flow progression (setup conversations only)
+          if (speaker === 'user' && 
+              setupConversation?.scenarioDraft === 'What difficult conversation are you avoiding today?') {
             handleIntakeResponse(message);
           }
         }
       });
       
       conversationRef.current = conversation;
+      console.log("VOICE: session started successfully", conversation);
+      
+      // Check if conversation is properly configured for input
+      console.log("VOICE: checking conversation configuration", {
+        conversationObject: !!conversation,
+        hasOnMessage: !!conversation.onMessage,
+        hasOnModeChange: !!conversation.onModeChange
+      });
+      
+      // Check if conversation is immediately ready for input
+      setTimeout(() => {
+        console.log("VOICE: conversation status after 1 second", {
+          isListening: conversationState === 'listening',
+          elevenLabsMode,
+          conversationState,
+          isSessionActive
+        });
+        
+        if (conversationState === 'listening') {
+          console.log("VOICE: UI shows listening - mic should be capturing audio");
+        } else {
+          console.log("VOICE: UI not in listening state - mic may not be active");
+        }
+      }, 1000);
     } catch (error) {
-      console.error('[Conversation] Failed to start ElevenLabs session:', error);
+      console.error('VOICE: start failed', error);
+      console.error('VOICE: error details', {
+        errorMessage: error.message,
+        errorStack: error.stack,
+        agentId: AGENT_ID
+      });
+      
       setIsSessionActive(false);
       setConversationState('idle');
       
       // Fallback to mock conversation for testing
+      console.log("VOICE: falling back to mock conversation");
       simulateConversation();
     }
   };
@@ -462,40 +639,113 @@ export function Conversation() {
         scenario: userMessage 
       });
       
-      // Check if we have enough information to commit to a session
-      // For now, commit after the user provides their scenario
-      if (updatedSetup.clarificationTranscript.length >= 2 && // At least one exchange
-          userMessage !== 'What difficult conversation are you avoiding today?' &&
-          userMessage.length > 10) { // User provided meaningful scenario
-        
-        console.log('[Conversation] Setup ready to commit to session');
-        
-        // Mark setup as ready and commit in next AI response
-        const readySetup = { ...updatedSetup, isReadyToStart: true };
-        updateSetupConversation(readySetup);
-        setSetupConversation(readySetup);
-      }
+      // Setup transition now handled by explicit user confirmation or Start simulation button
+      // No automatic transition based on transcript length
       
       return;
     }
     
-    // Legacy handling for existing sessions (this shouldn't happen with new flow)
-    if (!sessionId || !session) return;
+    // Sessions should not handle intake - this is now only for setup conversations
+    console.log('[Conversation] WARNING: Session received intake response, but intake should only happen in setup conversations');
+  };
+
+  const startSimulationFromSetup = async () => {
+    console.log('🚀 SETUP: startSimulationFromSetup called');
     
-    // Update session with the user's scenario
-    const updatedSession = { 
-      ...session, 
-      scenario: userMessage,
-      title: userMessage.length > 50 ? userMessage.substring(0, 47) + '...' : userMessage
-    };
+    if (!setupConversation || !setupId) {
+      console.error('🚀 SETUP: missing setupConversation or setupId', { setupConversation, setupId });
+      return;
+    }
     
-    updateSession(updatedSession);
-    setSession(updatedSession);
+    try {
+      console.log('🚀 SETUP: extracting user scenario');
+      
+      // Extract the scenario from the user's transcript
+      const userScenario = getUserScenarioFromTranscript(setupConversation.clarificationTranscript);
+      
+      if (!userScenario || userScenario.length < 10) {
+        console.error('🚀 SETUP: No valid scenario found', { scenario: userScenario });
+        return;
+      }
+      
+      console.log('🚀 SETUP: scenario extracted successfully', { scenario: userScenario });
+      
+      // Extract character information from the scenario
+      const characterInfo = extractCharacterFromScenario(userScenario);
+      console.log('🚀 SETUP: character info extracted', characterInfo);
+      
+      // Create the setup conversation with the extracted scenario and character info
+      const updatedSetup = {
+        ...setupConversation,
+        scenarioDraft: userScenario,
+        characterRole: characterInfo.role,
+        characterName: characterInfo.name,
+        isReadyToStart: true
+      };
+      
+      console.log('🚀 SETUP: updating setup conversation');
+      updateSetupConversation(updatedSetup);
+      
+      console.log('🚀 SETUP: calling commitSetupToSession');
+      
+      // Commit the setup conversation to a real session
+      const newSession = commitSetupToSession(setupId);
+      
+      console.log('🚀 SETUP: session created', { sessionId: newSession.id, session: newSession });
+      
+      console.log('🚀 SETUP: navigation starting');
+      
+      const targetUrl = `/conversation/${newSession.id}`;
+      console.log('🚀 SETUP: navigating to URL', { targetUrl });
+      
+      // Navigate to the new session - it will auto-start since it's a simulation phase session
+      navigate(targetUrl);
+      
+      console.log('🚀 SETUP: navigate() function called');
+      
+    } catch (error) {
+      console.error('🚀 SETUP: Failed to start simulation from setup:', error);
+    }
+  };
+
+  // Helper function to extract user scenario from transcript
+  const getUserScenarioFromTranscript = (transcript: TranscriptTurn[]): string => {
+    // Find the first substantial user response that isn't the initial question
+    for (const turn of transcript) {
+      if (turn.speaker === 'user' && 
+          turn.text !== 'What difficult conversation are you avoiding today?' &&
+          turn.text.length > 10) {
+        return turn.text;
+      }
+    }
+    return '';
+  };
+
+  // Helper function to extract character information from scenario text
+  const extractCharacterFromScenario = (scenario: string): { name: string; role: string } => {
+    const lowerScenario = scenario.toLowerCase();
     
-    console.log('[Conversation] Updated session with user scenario:', { 
-      scenario: userMessage,
-      title: updatedSession.title 
-    });
+    // Common relationship patterns
+    const patterns = [
+      { pattern: /(?:my )?cofounder|co-founder/, role: 'Co-founder', name: 'Alex' },
+      { pattern: /(?:my )?manager|boss|supervisor/, role: 'Manager', name: 'Manager' },
+      { pattern: /(?:my )?partner|boyfriend|girlfriend|spouse/, role: 'Partner', name: 'Partner' },
+      { pattern: /(?:my )?employee|team member|subordinate/, role: 'Team Member', name: 'Team Member' },
+      { pattern: /(?:my )?client|customer/, role: 'Client', name: 'Client' },
+      { pattern: /(?:my )?investor/, role: 'Investor', name: 'Investor' },
+      { pattern: /(?:my )?parent|mother|father|mom|dad/, role: 'Parent', name: 'Parent' },
+      { pattern: /(?:my )?friend/, role: 'Friend', name: 'Friend' },
+      { pattern: /(?:my )?roommate/, role: 'Roommate', name: 'Roommate' },
+    ];
+    
+    for (const { pattern, role, name } of patterns) {
+      if (pattern.test(lowerScenario)) {
+        return { role, name };
+      }
+    }
+    
+    // Default fallback
+    return { role: 'Conversation Partner', name: 'Alex' };
   };
 
   const commitSetupToSessionAndRedirect = async () => {
@@ -546,11 +796,23 @@ export function Conversation() {
       
       // Step 2: Generate combined feedback report
       console.log('🎤 GENERATING_COMBINED_FEEDBACK');
+      console.log('🔍 MAIN_FEEDBACK_AUDIT', {
+        messageCount: messages.length,
+        userMessageCount: messages.filter(m => m.role === 'user').length,
+        scenario: session.scenario,
+        messages: messages.map(m => ({ role: m.role, text: m.text }))
+      });
+      
       const feedbackReport = await audioAnalysisService.generateFeedbackReport(
         messages,
         audioAnalysis,
         session.scenario
       );
+      
+      console.log('🔍 FEEDBACK_RESULT_AUDIT', { 
+        feedbackGenerated: !!feedbackReport,
+        feedbackReport 
+      });
       
       // Step 3: Store results in the attempt
       if (feedbackReport) {
@@ -576,17 +838,354 @@ export function Conversation() {
     }
   };
 
-  const endCurrentAttempt = async () => {
-    if (!sessionId) return;
+  const hasInsufficientData = (transcript: any[]): boolean => {
+    const userTurns = transcript.filter(turn => turn.speaker === 'user');
+    const totalUserWords = userTurns.reduce((count, turn) => {
+      return count + turn.text.split(/\s+/).filter(word => word.length > 0).length;
+    }, 0);
     
-    console.log('🔚 ENDING_CURRENT_ATTEMPT', { sessionId });
+    console.log('🔍 DATA_SUFFICIENCY_CHECK', {
+      userTurnCount: userTurns.length,
+      totalUserWords,
+      meetsMinimumTurns: userTurns.length >= 3,
+      meetsMinimumWords: totalUserWords >= 100
+    });
     
-    // End ElevenLabs conversation
+    return userTurns.length < 3 || totalUserWords < 100;
+  };
+
+  const generateEvidenceBasedFeedback = (): any => {
+    const userTurns = transcript.filter(turn => turn.speaker === 'user');
+    
+    console.log('🔍 EVIDENCE_BASED_FEEDBACK_GENERATION', {
+      transcriptLength: transcript.length,
+      userTurnCount: userTurns.length,
+      transcript: transcript.map(t => ({ id: t.id, speaker: t.speaker, text: t.text }))
+    });
+    
+    // Check for insufficient data
+    if (hasInsufficientData(transcript)) {
+      return {
+        overallAssessment: "Not enough conversation data to generate meaningful coaching feedback. Continue the simulation or try another rehearsal.",
+        howYouCameAcross: "Insufficient conversation data for analysis.",
+        whatWorked: [],
+        opportunities: ["Have a longer conversation to enable coaching feedback"],
+        replayMoment: {
+          turnId: null,
+          originalMoment: "No sufficient user participation to analyze.",
+          howYouLikelySounded: "Unable to analyze - insufficient data.",
+          howItMayHaveLanded: "Unable to analyze - insufficient data.",
+          strongerVersion: "Continue the conversation to get meaningful feedback.",
+          deliveryTip: "Practice more to generate evidence-based coaching."
+        }
+      };
+    }
+    
+    // Generate evidence-based feedback for sufficient data
+    const strengths = analyzeStrengths(userTurns, transcript);
+    const opportunities = analyzeOpportunities(userTurns, transcript);
+    const assessment = generateEvidenceBasedAssessment(userTurns, transcript);
+    const howYouCameAcross = analyzeHowYouCameAcross(userTurns, transcript);
+    const replayMoment = identifyReplayMoment(userTurns, transcript);
+    
+    return {
+      overallAssessment: assessment.text,
+      howYouCameAcross: howYouCameAcross.text,
+      whatWorked: strengths.map(s => s.claim),
+      opportunities: opportunities.map(o => o.claim),
+      replayMoment,
+      // Developer validation mode
+      _validation: {
+        assessment: { claim: assessment.text, supportingMessages: assessment.evidence },
+        howYouCameAcross: { claim: howYouCameAcross.text, supportingMessages: howYouCameAcross.evidence },
+        strengths: strengths,
+        opportunities: opportunities
+      }
+    };
+  };
+
+  const analyzeStrengths = (userTurns: any[], fullTranscript: any[]) => {
+    const strengths = [];
+    
+    // Look for evidence of specific positive behaviors
+    for (const turn of userTurns) {
+      const text = turn.text.toLowerCase();
+      
+      // Evidence: Direct acknowledgment
+      if (text.includes('i understand') || text.includes('i see') || text.includes('that makes sense')) {
+        strengths.push({
+          claim: `You acknowledged their perspective when you said "${turn.text.substring(0, 50)}..."`,
+          supportingMessages: [turn.id],
+          evidence: turn.text
+        });
+      }
+      
+      // Evidence: Asking clarifying questions  
+      if (text.includes('what') && text.includes('?') || text.includes('how') && text.includes('?')) {
+        strengths.push({
+          claim: `You asked clarifying questions, showing engagement: "${turn.text}"`,
+          supportingMessages: [turn.id],
+          evidence: turn.text
+        });
+      }
+      
+      // Evidence: Taking ownership
+      if (text.includes('my mistake') || text.includes('i should have') || text.includes('i was wrong')) {
+        strengths.push({
+          claim: `You took ownership of the issue: "${turn.text}"`,
+          supportingMessages: [turn.id],
+          evidence: turn.text
+        });
+      }
+      
+      // Evidence: Proposing solutions
+      if (text.includes('we could') || text.includes('what if') || text.includes('let\'s')) {
+        strengths.push({
+          claim: `You proposed collaborative solutions: "${turn.text}"`,
+          supportingMessages: [turn.id], 
+          evidence: turn.text
+        });
+      }
+    }
+    
+    // Return max 3 strengths with strongest evidence
+    return strengths.slice(0, 3);
+  };
+
+  const analyzeOpportunities = (userTurns: any[], fullTranscript: any[]) => {
+    const opportunities = [];
+    
+    for (const turn of userTurns) {
+      const text = turn.text.toLowerCase();
+      
+      // Evidence: Defensive language
+      if (text.includes('but') || text.includes('however') || text.includes('actually')) {
+        opportunities.push({
+          claim: `Consider removing defensive language. Instead of "${turn.text.substring(0, 30)}...", try a more collaborative approach.`,
+          supportingMessages: [turn.id],
+          evidence: turn.text
+        });
+      }
+      
+      // Evidence: Vague responses
+      if (text.includes('maybe') || text.includes('i think') || text.includes('probably') || text.includes('sort of')) {
+        opportunities.push({
+          claim: `Replace uncertain language with confident statements. Your response "${turn.text}" could be more definitive.`,
+          supportingMessages: [turn.id],
+          evidence: turn.text
+        });
+      }
+      
+      // Evidence: Very short responses (less than 5 words)
+      if (turn.text.split(' ').length < 5) {
+        opportunities.push({
+          claim: `Expand on your thoughts. Your brief response "${turn.text}" could include more detail or reasoning.`,
+          supportingMessages: [turn.id],
+          evidence: turn.text
+        });
+      }
+    }
+    
+    return opportunities.slice(0, 3);
+  };
+
+  const generateEvidenceBasedAssessment = (userTurns: any[], fullTranscript: any[]) => {
+    const userResponseCount = userTurns.length;
+    const avgResponseLength = userTurns.reduce((sum, turn) => sum + turn.text.length, 0) / userTurns.length;
+    const totalWords = userTurns.reduce((count, turn) => count + turn.text.split(/\s+/).length, 0);
+    
+    let assessment = `You participated in ${userResponseCount} exchanges with an average response length of ${Math.round(avgResponseLength)} characters (${totalWords} total words). `;
+    
+    // Add specific evidence-based observations
+    const hasQuestions = userTurns.some(turn => turn.text.includes('?'));
+    const hasOwnership = userTurns.some(turn => 
+      turn.text.toLowerCase().includes('my mistake') || 
+      turn.text.toLowerCase().includes('i should have'));
+    
+    if (hasQuestions) {
+      assessment += "You asked questions to gather information. ";
+    }
+    
+    if (hasOwnership) {
+      assessment += "You demonstrated accountability by taking ownership. ";
+    }
+    
+    return {
+      text: assessment,
+      evidence: userTurns.map(turn => turn.id)
+    };
+  };
+
+  const analyzeHowYouCameAcross = (userTurns: any[], fullTranscript: any[]) => {
+    // Analyze tone and delivery based on word choice and structure
+    const allText = userTurns.map(turn => turn.text.toLowerCase()).join(' ');
+    
+    let tone = "measured";
+    const evidence = [];
+    
+    if (allText.includes('sorry') || allText.includes('apologize')) {
+      tone = "apologetic and accommodating";
+      evidence.push(...userTurns.filter(turn => 
+        turn.text.toLowerCase().includes('sorry') || 
+        turn.text.toLowerCase().includes('apologize')).map(turn => turn.id));
+    } else if (allText.includes('definitely') || allText.includes('absolutely') || allText.includes('certainly')) {
+      tone = "confident and direct";  
+      evidence.push(...userTurns.filter(turn => 
+        turn.text.toLowerCase().includes('definitely') || 
+        turn.text.toLowerCase().includes('absolutely')).map(turn => turn.id));
+    } else if (allText.includes('maybe') || allText.includes('perhaps') || allText.includes('i think')) {
+      tone = "tentative and thoughtful";
+      evidence.push(...userTurns.filter(turn => 
+        turn.text.toLowerCase().includes('maybe') || 
+        turn.text.toLowerCase().includes('perhaps')).map(turn => turn.id));
+    }
+    
+    return {
+      text: `You likely came across as ${tone} based on your language choices.`,
+      evidence: evidence
+    };
+  };
+
+  const identifyReplayMoment = (userTurns: any[], fullTranscript: any[]) => {
+    if (userTurns.length === 0) {
+      return {
+        turnId: null,
+        originalMoment: "No user responses to analyze.",
+        howYouLikelySounded: "No audio data.",
+        howItMayHaveLanded: "No interaction occurred.",
+        strongerVersion: "Participate more in the conversation.",
+        deliveryTip: "Practice speaking up during conversations."
+      };
+    }
+    
+    // Pick the longest user response as most substantial for analysis
+    const longestResponse = userTurns.reduce((longest, current) => 
+      current.text.length > longest.text.length ? current : longest
+    );
+    
+    return {
+      turnId: longestResponse.id,
+      originalMoment: longestResponse.text,
+      howYouLikelySounded: `This response was ${longestResponse.text.length} characters and likely came across as your most substantial contribution.`,
+      howItMayHaveLanded: "This represented your main engagement with the conversation.",
+      strongerVersion: longestResponse.text + " What are your thoughts on this approach?",
+      deliveryTip: "Consider building on substantial responses like this with follow-up questions or additional detail."
+    };
+  };
+
+  const generateFallbackFeedbackReport = (): any => {
+    console.log('🔍 FALLBACK_FEEDBACK_AUDIT', {
+      transcriptLength: transcript.length,
+      userTurnCount: transcript.filter(turn => turn.speaker === 'user').length,
+      transcript: transcript.map(t => ({ id: t.id, speaker: t.speaker, text: t.text }))
+    });
+    
+    // Always use evidence-based feedback generation
+    return generateEvidenceBasedFeedback();
+  };
+
+  const forceCompleteCurrentConversation = () => {
+    console.trace("FORCE_COMPLETE_CALLED");
+    console.log('🔚 FORCE_COMPLETE_CONVERSATION', { sessionId, session, currentAttempt });
+    
+    // Add guard to prevent execution when no session
+    if (!sessionId && !session) {
+      console.log('🔚 FORCE_COMPLETE: No session to complete, returning early');
+      return;
+    }
+    
+    // Clear inactivity timeout
+    clearInactivityTimeout();
+    
+    // Set local voice state to idle / inactive
+    setIsSessionActive(false);
+    setConversationState('idle');
+    setIsRecording(false);
+    
+    // Try to stop ElevenLabs session but don't block on it
     if (conversationRef.current) {
+      try {
+        conversationRef.current.endSession();
+        conversationRef.current = null;
+      } catch (error) {
+        console.log('ElevenLabs cleanup failed, continuing anyway:', error);
+      }
+    }
+    
+    // Stop audio recording but don't block
+    if (isRecording) {
+      try {
+        audioRecordingService.stopRecording();
+      } catch (error) {
+        console.log('Audio recording cleanup failed, continuing anyway:', error);
+      }
+    }
+    
+    if (!sessionId || !session) {
+      console.log('No valid session to complete');
+      return;
+    }
+    
+    // Force complete the session state
+    const now = new Date().toISOString();
+    
+    console.trace('SESSION_MARKED_COMPLETE: Updating session status to complete');
+    const updatedSession = {
+      ...session,
+      status: 'complete' as const,
+      phase: 'complete' as const
+    };
+    
+    console.trace('ATTEMPT_MARKED_COMPLETE: Updating attempt status to complete');
+    const updatedAttempt = currentAttempt ? {
+      ...currentAttempt,
+      status: 'complete' as const,
+      endedAt: now,
+      feedbackReport: currentAttempt.feedbackReport || generateFallbackFeedbackReport()
+    } : null;
+    
+    // Update the attempt in the session
+    if (updatedSession.attempts && updatedAttempt) {
+      const attemptIndex = updatedSession.attempts.findIndex(a => a.id === updatedAttempt.id);
+      if (attemptIndex >= 0) {
+        updatedSession.attempts[attemptIndex] = updatedAttempt;
+      }
+    }
+    
+    // Persist to localStorage
+    try {
+      console.trace('CALLING_endSessionAttempt: Persisting session completion');
+      endSessionAttempt(sessionId);
+    } catch (error) {
+      console.log('Session persistence failed, updating local state anyway:', error);
+    }
+    
+    // Update local state immediately
+    setSession(updatedSession);
+    setCurrentAttempt(updatedAttempt);
+    
+    console.log('Session force completed:', { updatedSession, updatedAttempt });
+  };
+
+  const forceEndCurrentSession = async () => {
+    if (!sessionId) {
+      console.log('ERROR: No sessionId when trying to end session');
+      return;
+    }
+    
+    console.log('🔚 FORCE_END_SESSION', { sessionId, session, currentAttempt });
+    
+    // Clear inactivity timeout
+    clearInactivityTimeout();
+    
+    // Stop voice interaction if available
+    if (conversationRef.current) {
+      console.log('Ending ElevenLabs conversation');
       await conversationRef.current.endSession();
       conversationRef.current = null;
     }
     
+    // Set voice state to idle
     setIsSessionActive(false);
     setConversationState('idle');
     
@@ -598,24 +1197,98 @@ export function Conversation() {
     }
     
     // Generate feedback report with audio analysis
-    await generateFeedbackReport(audioBlob);
-    
-    // Update session status to completed
-    if (session) {
-      session.status = 'complete';
-      updateSession(session);
+    try {
+      await generateFeedbackReport(audioBlob);
+    } catch (error) {
+      console.log('Feedback generation failed, but continuing with session completion');
     }
     
-    // Update local state
+    // Use the proper library function to complete the attempt
+    // This sets session.status = "complete", session.phase = "complete", 
+    // currentAttempt.status = "complete", currentAttempt.endedAt = now, and persists
+    console.log('Calling endSessionAttempt with sessionId:', sessionId);
+    endSessionAttempt(sessionId);
+    console.log('endSessionAttempt called successfully');
+    
+    // Update local state to reflect the changes
     const updatedSession = getSession(sessionId);
     const updatedAttempt = getCurrentAttempt(updatedSession);
+    
+    console.log('Session completed:', { updatedSession, updatedAttempt });
     
     setSession(updatedSession);
     setCurrentAttempt(updatedAttempt);
   };
 
+  const endCurrentAttempt = async () => {
+    await forceEndCurrentSession();
+  };
+
+  // Centralized function to end the current conversation
+  const endCurrentConversation = async () => {
+    await endCurrentAttempt();
+  };
+
   const handleEndConversation = () => {
-    endCurrentAttempt();
+    console.log("END_CALL_CLICKED", { 
+      hasSetupConversation: Boolean(setupConversation), 
+      hasSessionId: Boolean(sessionId), 
+      hasSession: Boolean(session),
+      sessionPhase: session?.phase,
+      setupId,
+      currentUrl: window.location.href,
+      params
+    });
+    
+    // If this is a setup conversation with content, complete it directly
+    if (setupConversation && setupId && !sessionId && !session && transcript.length > 0) {
+      console.log("END_CALL: Completing setup conversation directly");
+      
+      // Create a minimal session-like object for the completion UI
+      const mockSession = {
+        id: setupId,
+        title: setupConversation.scenarioDraft || 'Setup Conversation',
+        scenario: setupConversation.scenarioDraft || 'Setup Conversation',
+        status: 'complete' as const,
+        phase: 'complete' as const,
+        characterName: setupConversation.characterName || 'Assistant',
+        characterRole: setupConversation.characterRole || 'Conversation Partner',
+        attempts: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      
+      const mockAttempt = {
+        id: `attempt_${Date.now()}`,
+        attemptNumber: 1,
+        status: 'complete' as const,
+        startedAt: transcript[0]?.timestamp || new Date().toISOString(),
+        endedAt: new Date().toISOString(),
+        transcript,
+        feedbackReport: generateFallbackFeedbackReport()
+      };
+      
+      // Update local state to show completion
+      setSession(mockSession);
+      setCurrentAttempt(mockAttempt);
+      setIsSessionActive(false);
+      setConversationState('idle');
+      
+      console.log("END_CALL: Setup conversation completed with mock session");
+      return;
+    }
+    
+    // Handle regular sessions
+    if (sessionId && session) {
+      console.log("END_CALL: Completing existing session");
+      forceCompleteCurrentConversation();
+      return;
+    }
+    
+    // No session and no convertible setup - navigate home
+    console.log("END_CALL: No session to complete, navigating home");
+    console.trace('NAVIGATE_HOME_CALLED: No session in handleEndConversation');
+    navigate('/');
   };
 
   const handleViewFeedback = () => {
@@ -667,6 +1340,7 @@ export function Conversation() {
   };
 
   const handleBackHome = () => {
+    console.trace('NAVIGATE_HOME_CALLED: handleBackHome');
     navigate('/');
   };
 
@@ -713,12 +1387,82 @@ export function Conversation() {
     if (isDecline) {
       console.log('🛑 USER_DECLINE_DETECTED', { message: lowerMessage });
       
-      // Allow brief response time then end
-      setTimeout(() => {
-        if (isSessionActive) { // Check if still active
-          endCurrentAttempt();
-        }
-      }, 2000); // 2 second delay to allow final agent response
+      // DISABLED: Auto-ending on user decline for demo safety
+      // setTimeout(() => {
+      //   if (isSessionActive) { // Check if still active
+      //     endCurrentAttempt();
+      //   }
+      // }, 2000); // 2 second delay to allow final agent response
+    }
+  };
+
+  // Natural ending detection completely removed - users control via End Call button
+
+  const startInactivityTimeout = () => {
+    // Clear any existing timeout
+    if (inactivityTimeoutRef.current) {
+      clearTimeout(inactivityTimeoutRef.current);
+    }
+    
+    // DISABLED: Inactivity timeout for demo safety
+    // inactivityTimeoutRef.current = setTimeout(() => {
+    //   if (isSessionActive) {
+    //     console.log('⏰ CONVERSATION_TIMEOUT_REACHED');
+    //     endCurrentAttempt();
+    //   }
+    // }, 5 * 60 * 1000); // 5 minutes
+  };
+
+  const clearInactivityTimeout = () => {
+    if (inactivityTimeoutRef.current) {
+      clearTimeout(inactivityTimeoutRef.current);
+      inactivityTimeoutRef.current = null;
+    }
+  };
+
+  const checkForSimulationReadiness = (message: string) => {
+    if (!setupConversation || !setupId) return;
+    
+    const lowerMessage = message.toLowerCase().trim();
+    const readinessConfirmations = [
+      'yes',
+      'ready',
+      'let\'s do it',
+      'let\'s start',
+      'begin',
+      'start',
+      'i\'m ready',
+      'let\'s begin',
+      'go ahead',
+      'sure',
+      'okay',
+      'ok',
+      'yes, ready',
+      'ready to begin',
+      'let\'s practice',
+      'start the simulation'
+    ];
+    
+    const isReady = readinessConfirmations.some(phrase => 
+      lowerMessage === phrase || lowerMessage.startsWith(phrase + ' ')
+    );
+    
+    if (isReady) {
+      console.log('🚀 SETUP: user confirmed readiness', { message: lowerMessage });
+      
+      // Check if we have a scenario to work with
+      const userScenario = getUserScenarioFromTranscript(setupConversation.clarificationTranscript);
+      
+      if (userScenario && userScenario.length > 10) {
+        console.log('🚀 SETUP: scenario found, scheduling simulation start', { scenario: userScenario });
+        // Allow a brief moment for the confirmation message, then start simulation
+        setTimeout(() => {
+          console.log('🚀 SETUP: timeout complete, calling startSimulationFromSetup');
+          startSimulationFromSetup();
+        }, 1000); // 1 second delay
+      } else {
+        console.log('🚀 SETUP: USER_READY_BUT_NO_SCENARIO', { scenario: userScenario });
+      }
     }
   };
 
@@ -740,21 +1484,48 @@ export function Conversation() {
 
   // Mock conversation simulation - TODO: Replace with real ElevenLabs integration
   const simulateConversation = () => {
-    if (!sessionId) return;
+    console.log("VOICE: simulateConversation called", { sessionId, setupId });
+    
+    if (!sessionId && !setupId) {
+      console.error("VOICE: simulateConversation - no sessionId or setupId");
+      return;
+    }
 
     // Mock initial AI greeting
     setTimeout(() => {
-      const aiTurn = sessionManager.addTranscriptTurn(
-        sessionId,
-        'agent',
-        `Hi there! I understand you wanted to discuss ${session?.scenario.toLowerCase()}. I appreciate you making time for this important conversation. How are you feeling about this topic?`
-      );
-      setTranscript(prev => [...prev, aiTurn]);
+      console.log("VOICE: adding mock AI greeting");
+      
+      let aiTurn;
+      if (sessionId) {
+        aiTurn = sessionManager.addTranscriptTurn(
+          sessionId,
+          'agent',
+          `Hi there! I understand you wanted to discuss ${session?.scenario.toLowerCase()}. I appreciate you making time for this important conversation. How are you feeling about this topic?`
+        );
+      } else if (setupId) {
+        aiTurn = sessionManager.addSetupTranscriptTurn(
+          setupId,
+          'agent',
+          'What conversation do you need to rehearse?'
+        );
+      }
+      
+      if (aiTurn) {
+        setTranscript(prev => [...prev, aiTurn]);
+        console.log("VOICE: mock AI greeting added", aiTurn);
+      }
+      
       setConversationState('listening');
+      console.log("VOICE: mock conversation ready for input");
     }, 2000);
   };
 
   const handleMockUserInput = (text: string) => {
+    // Reset inactivity timeout on any message
+    if (isSessionActive) {
+      startInactivityTimeout();
+    }
+    
     let userTurn;
     
     // Handle setup conversations vs regular sessions
@@ -777,11 +1548,15 @@ export function Conversation() {
     // Check for user decline in mock inputs too
     checkForUserDecline(text);
     
+    // Check for user readiness in setup conversations
+    if (setupConversation) {
+      checkForSimulationReadiness(text);
+    }
+    
     // No live coaching during conversation
     
-    // Handle intake response for mock too
-    if ((session?.scenario === 'What difficult conversation are you avoiding today?') ||
-        (setupConversation?.scenarioDraft === 'What difficult conversation are you avoiding today?')) {
+    // Handle intake response for mock too (setup conversations only)
+    if (setupConversation?.scenarioDraft === 'What difficult conversation are you avoiding today?') {
       handleIntakeResponse(text);
     }
     
@@ -791,14 +1566,27 @@ export function Conversation() {
     setTimeout(() => {
       let responses: string[];
       
-      if ((session?.scenario === 'What difficult conversation are you avoiding today?') ||
-          (setupConversation?.scenarioDraft === 'What difficult conversation are you avoiding today?')) {
-        responses = [
-          "That sounds important. Who do you need to have this conversation with?",
-          "I understand. What outcome are you hoping for from this conversation?",
-          "That's a significant topic. What are you most worried might happen during this conversation?",
-          "Got it. I'll help you practice this. What's your main goal for this conversation?"
-        ];
+      if (setupConversation?.scenarioDraft === 'What difficult conversation are you avoiding today?') {
+        // Check if we already have a user scenario in the transcript
+        const userScenario = getUserScenarioFromTranscript(setupConversation.clarificationTranscript);
+        
+        if (userScenario && userScenario.length > 10) {
+          // User has provided a scenario, ask if they're ready
+          responses = [
+            "Got it. I understand you need to have this conversation. Ready to begin the practice session?",
+            "That sounds like an important conversation. Shall we start practicing this scenario?",
+            "I can help you prepare for that. Are you ready to begin the roleplay?",
+            "Understood. Let's practice this conversation. Ready to start?"
+          ];
+        } else {
+          // Still gathering info
+          responses = [
+            "That sounds important. Who do you need to have this conversation with?",
+            "I understand. What outcome are you hoping for from this conversation?",
+            "That's a significant topic. What are you most worried might happen during this conversation?",
+            "Got it. I'll help you practice this. What's your main goal for this conversation?"
+          ];
+        }
       } else {
         responses = [
           "I can understand why that would be concerning. Can you tell me more about your specific worries?",
@@ -810,32 +1598,39 @@ export function Conversation() {
       
       const response = responses[Math.floor(Math.random() * responses.length)];
       
+      // Reset inactivity timeout for AI responses too
+      if (isSessionActive) {
+        startInactivityTimeout();
+      }
+      
       // Handle setup conversations vs regular sessions
       if (setupConversation && setupId) {
         const aiTurn = sessionManager.addSetupTranscriptTurn(setupId, 'agent', response);
         setTranscript(prev => [...prev, aiTurn]);
         
-        // Check if setup is ready to transition to session
-        if (setupConversation.isReadyToStart) {
-          console.log('[Conversation] Setup is ready, will transition after this response');
-          // Transition after a short delay to let user see the response
-          setTimeout(() => {
-            commitSetupToSessionAndRedirect();
-          }, 2000);
-        }
+        // Setup transition now handled via user confirmation or Start simulation button
+        // No automatic transition in AI response
       } else if (sessionId) {
         const aiTurn = sessionManager.addTranscriptTurn(sessionId, 'agent', response);
         setTranscript(prev => [...prev, aiTurn]);
+        
+        // Natural ending detection removed - users control via End Call button
       }
       
       setConversationState('listening');
     }, 1500);
   };
 
-  if (!session) {
+  if (!session && !setupConversation) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Loading conversation...</p>
+        <div className="text-center">
+          <p className="text-muted-foreground mb-4">Session not found</p>
+          <Button onClick={() => { 
+            console.trace('NAVIGATE_HOME_CALLED: Back home button'); 
+            navigate('/'); 
+          }}>Back home</Button>
+        </div>
       </div>
     );
   }
@@ -890,8 +1685,18 @@ export function Conversation() {
     return 'Conversation practice';
   };
 
+  // Extract the exact active condition used by the header
+  const shouldShowActiveStatus = isSessionActive;
+  
+  // Show End Call button if there's any active session or setup conversation
+  const shouldShowEndCall = isSessionActive || Boolean(setupConversation) || Boolean(session);
+  
+  // Debug logging
+  console.log("Conversation render: isSessionActive =", isSessionActive);
+  console.log("Conversation render: shouldShowEndCall =", shouldShowEndCall);
+
   const getSessionStatus = (): 'active' | 'complete' | 'idle' => {
-    if (isSessionActive) return 'active';
+    if (shouldShowActiveStatus) return 'active';
     if (currentAttempt?.status === 'complete') return 'complete';
     return 'idle';
   };
@@ -903,9 +1708,11 @@ export function Conversation() {
         title={getSessionTitle()}
         subtitle={getSessionSubtitle()}
         status={getSessionStatus()}
-        showHomeButton={true}
+        showHomeButton={false}
         showHistoryButton={true}
         onHistoryClick={openHistoryPanel}
+        showEndCall={shouldShowEndCall}
+        onEndCall={handleEndConversation}
       />
 
       {/* Session Controls Bar */}
@@ -928,24 +1735,13 @@ export function Conversation() {
             </div>
             
             <div className="flex items-center gap-3">
-              {/* Show End Call button for active sessions and attempts */}
-              {(isCallActive() || currentAttempt?.status === 'ending') ? (
-                <Button
-                  onClick={handleEndConversation}
-                  variant="destructive"
-                  size="sm"
-                  className="flex items-center gap-2"
-                >
-                  <PhoneOff className="w-4 h-4" />
-                  End call
-                </Button>
-              ) : currentAttempt?.status === 'complete' ? (
+              {currentAttempt?.status === 'complete' && (
                 <div className="text-right">
                   <div className="text-xs text-muted-foreground">
                     Duration: {calculateDuration()} · {transcript.length} messages
                   </div>
                 </div>
-              ) : null}
+              )}
             </div>
           </div>
         </div>
@@ -1005,6 +1801,7 @@ export function Conversation() {
             )}
           </div>
 
+
           {/* Conversation completion bar */}
           {currentAttempt?.status === 'complete' && !isGeneratingFeedback && (
             <div className="border-t border-border bg-card/50 p-4">
@@ -1022,7 +1819,7 @@ export function Conversation() {
                     {currentAttempt.feedbackReport && (
                       <Button
                         onClick={handleViewFeedback}
-                        variant="default"
+                        variant="primary"
                         size="sm"
                         className="bg-purple-600 hover:bg-purple-700"
                       >
@@ -1061,18 +1858,23 @@ export function Conversation() {
           )}
 
           {/* Voice interaction area */}
-          {isSessionActive && (
+          {(isSessionActive || Boolean(setupConversation)) && (
             <div className="border-t border-border bg-card/50 backdrop-blur-sm p-6">
               <div className={`max-w-4xl mx-auto transition-all duration-300 ${
                 isFeedbackOpen ? 'max-w-3xl' : 'max-w-4xl'
               }`}>
                 <div className="flex items-center justify-center">
                   <div className="text-center">
-                    <SimpleVoiceOrb state={conversationState} />
+                    <SimpleVoiceOrb 
+                      state={conversationState} 
+                      onClick={handleStartConversation}
+                      clickable={setupConversation ? !isSessionActive : false}
+                    />
                     <p className="text-sm text-muted-foreground mt-4">
                       {conversationState === 'listening' && 'Speak naturally'}
                       {conversationState === 'thinking' && 'Processing your response...'}
                       {conversationState === 'speaking' && 'AI is responding...'}
+                      {setupConversation && conversationState === 'idle' && 'Tap to start voice conversation'}
                     </p>
                   </div>
                 </div>

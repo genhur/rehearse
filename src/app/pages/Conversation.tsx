@@ -830,24 +830,30 @@ export function Conversation() {
   };
 
   const generateFallbackFeedbackReport = (): any => {
+    const userTurns = transcript.filter(turn => turn.speaker === 'user');
+    const sampleUserText = userTurns.length > 0 ? userTurns[0].text : "I understand your concern.";
+    
     return {
-      overallAssessment: "This was a practice conversation to help you prepare for the real thing.",
-      howYouCameAcross: "You participated actively in the conversation practice.",
+      overallAssessment: "This was a practice conversation to help you prepare for the real thing. You engaged with the scenario and practiced important communication skills.",
+      howYouCameAcross: "You participated actively in the conversation practice and showed willingness to engage with challenging topics.",
       whatWorked: [
         "You engaged with the conversation scenario",
-        "You practiced important communication skills"
+        "You practiced important communication skills",
+        "You stayed focused on the conversation topic"
       ],
       opportunities: [
-        "Consider practicing different responses",
-        "Think about your tone and delivery"
+        "Consider practicing different response approaches",
+        "Think about your tone and delivery",
+        "Focus on building on your communication strengths"
       ],
-      replayMoments: transcript.length > 0 ? [
-        {
-          turnId: transcript[Math.floor(transcript.length / 2)]?.id || transcript[0]?.id,
-          title: "Key moment",
-          description: "Review this exchange for improvement opportunities"
-        }
-      ] : []
+      replayMoment: {
+        turnId: userTurns.length > 0 ? userTurns[0].id : null,
+        originalMoment: sampleUserText,
+        howYouLikelySounded: "This came across as thoughtful and engaged.",
+        howItMayHaveLanded: "Your response likely came across as genuine and considerate.",
+        strongerVersion: sampleUserText + " Could you tell me more about that?",
+        deliveryTip: "Consider adding follow-up questions to show deeper engagement."
+      }
     };
   };
 

@@ -145,10 +145,17 @@ export class AudioAnalysisService {
     audioAnalysis: AudioAnalysis | null,
     scenario: string
   ): Promise<FeedbackReport | null> {
+    console.log('🔍 FEEDBACK_GENERATION_AUDIT', {
+      messageCount: messages.length,
+      messages: messages.map(m => ({ id: m.id, role: m.role, text: m.text })),
+      scenario,
+      hasAudioAnalysis: !!audioAnalysis
+    });
+    
     const openaiApiKey = import.meta.env.VITE_OPENAI_API_KEY;
     
     if (!openaiApiKey) {
-      console.warn('🎤 OPENAI_API_KEY_NOT_CONFIGURED');
+      console.warn('🎤 OPENAI_API_KEY_NOT_CONFIGURED - Using mock feedback');
       return this.createMockFeedback(messages, audioAnalysis);
     }
 
@@ -198,6 +205,13 @@ ${audioAnalysis ? `Primary emotion detected: ${audioAnalysis.primaryEmotion} (${
 
 Analyze this rehearsal focusing on both content and delivery. Help the user understand how they came across.`;
 
+      console.log('🔍 OPENAI_REQUEST_AUDIT', {
+        systemPrompt,
+        userPrompt,
+        transcriptLength: transcript.length,
+        userTurnCount: messages.filter(m => m.role === 'user').length
+      });
+
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -222,6 +236,11 @@ Analyze this rehearsal focusing on both content and delivery. Help the user unde
       const result = await response.json();
       const feedback = JSON.parse(result.choices[0].message.content);
 
+      console.log('🔍 OPENAI_RESPONSE_AUDIT', {
+        rawResponse: result.choices[0].message.content,
+        parsedFeedback: feedback
+      });
+      
       console.log('🎤 FEEDBACK_REPORT_GENERATED', feedback);
       return feedback;
 
@@ -237,6 +256,12 @@ Analyze this rehearsal focusing on both content and delivery. Help the user unde
   }
 
   private createMockFeedback(messages: Message[], audioAnalysis: AudioAnalysis | null): FeedbackReport {
+    console.log('🔍 MOCK_FEEDBACK_AUDIT', {
+      messageCount: messages.length,
+      userTurnCount: messages.filter(m => m.role === 'user').length,
+      messages: messages.map(m => ({ id: m.id, role: m.role, text: m.text }))
+    });
+    
     return {
       overallAssessment: "You communicated the key points clearly and maintained a professional tone throughout the conversation. When challenged, you showed some hesitation but ultimately provided the necessary information.",
       howYouCameAcross: audioAnalysis ? `${audioAnalysis.primaryEmotion} and measured` : "Thoughtful and composed",

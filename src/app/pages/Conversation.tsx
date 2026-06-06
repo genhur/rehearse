@@ -799,11 +799,23 @@ export function Conversation() {
       
       // Step 2: Generate combined feedback report
       console.log('🎤 GENERATING_COMBINED_FEEDBACK');
+      console.log('🔍 MAIN_FEEDBACK_AUDIT', {
+        messageCount: messages.length,
+        userMessageCount: messages.filter(m => m.role === 'user').length,
+        scenario: session.scenario,
+        messages: messages.map(m => ({ role: m.role, text: m.text }))
+      });
+      
       const feedbackReport = await audioAnalysisService.generateFeedbackReport(
         messages,
         audioAnalysis,
         session.scenario
       );
+      
+      console.log('🔍 FEEDBACK_RESULT_AUDIT', { 
+        feedbackGenerated: !!feedbackReport,
+        feedbackReport 
+      });
       
       // Step 3: Store results in the attempt
       if (feedbackReport) {
@@ -832,6 +844,13 @@ export function Conversation() {
   const generateFallbackFeedbackReport = (): any => {
     const userTurns = transcript.filter(turn => turn.speaker === 'user');
     const sampleUserText = userTurns.length > 0 ? userTurns[0].text : "I understand your concern.";
+    
+    console.log('🔍 FALLBACK_FEEDBACK_AUDIT', {
+      transcriptLength: transcript.length,
+      userTurnCount: userTurns.length,
+      transcript: transcript.map(t => ({ id: t.id, speaker: t.speaker, text: t.text })),
+      sampleUserText
+    });
     
     return {
       overallAssessment: "This was a practice conversation to help you prepare for the real thing. You engaged with the scenario and practiced important communication skills.",

@@ -148,55 +148,143 @@ export function Conversation() {
   }, []);
 
   const handleStartConversation = async () => {
-    // Support both regular sessions and setup conversations
-    if (!sessionId && !setupId) return;
+    console.log("VOICE: orb clicked", { sessionId, setupId, mode: sessionId ? 'simulation' : 'setup' });
     
+    // Support both regular sessions and setup conversations
+    if (!sessionId && !setupId) {
+      console.error("VOICE: No sessionId or setupId, cannot start");
+      return;
+    }
+    
+    console.log("VOICE: setting UI to active state");
     setIsSessionActive(true);
-    setConversationState('listening');
+    
+    // Don't set to listening until we verify mic access
+    setConversationState('thinking');
+    console.log("VOICE: initial state set to thinking, will change to listening after mic verification");
     
     // Start inactivity timeout
     startInactivityTimeout();
     
+    console.log("MIC_PERMISSION_REQUESTED");
+    
+    // Check microphone permissions first
+    try {
+      const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+      console.log("VOICE: microphone permission status", permissionStatus.state);
+      
+      if (permissionStatus.state === 'granted') {
+        console.log("MIC_PERMISSION_GRANTED");
+      } else if (permissionStatus.state === 'denied') {
+        console.log("MIC_PERMISSION_DENIED");
+      }
+    } catch (permError) {
+      console.warn("VOICE: could not check microphone permission", permError);
+    }
+    
+    // Test getUserMedia directly
+    try {
+      console.log("VOICE: testing getUserMedia access");
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      console.log("VOICE: getUserMedia successful", { tracks: stream.getAudioTracks().length });
+      
+      // Check if tracks are active
+      stream.getAudioTracks().forEach((track, index) => {
+        console.log(`VOICE: audio track ${index}`, { 
+          enabled: track.enabled, 
+          readyState: track.readyState,
+          label: track.label 
+        });
+      });
+      
+      // Clean up test stream
+      stream.getTracks().forEach(track => track.stop());
+      console.log("VOICE: getUserMedia test stream cleaned up");
+      
+    } catch (getUserMediaError) {
+      console.error("USER_AUDIO_INPUT_ERROR: getUserMedia failed", getUserMediaError);
+      console.error("MIC_PERMISSION_DENIED: getUserMedia access denied");
+    }
+    
+    console.log("VOICE: starting audio recording service");
     // Start audio recording
     const recordingStarted = await audioRecordingService.startRecording();
     if (recordingStarted) {
       setIsRecording(true);
+      console.log("VOICE: audio recording started successfully");
+    } else {
+      console.error("VOICE: audio recording failed to start");
     }
     
     try {
+      console.log("VOICE: starting ElevenLabs session", { agentId: AGENT_ID, mode: sessionId ? 'simulation' : 'setup' });
+      
       const conversation = await ElevenLabsConversation.startSession({
         agentId: AGENT_ID,
         onConnect: () => {
-          console.log('[Conversation] ElevenLabs connected');
+          console.log('ELEVENLABS_SESSION_STARTED');
+          console.log('VOICE: ElevenLabs connected successfully');
         },
         onDisconnect: () => {
-          console.log('[Conversation] ElevenLabs disconnected');
+          console.log('VOICE: ElevenLabs disconnected');
           conversationRef.current = null;
           setIsSessionActive(false);
           setConversationState('idle');
         },
         onError: (message) => {
-          console.error('[Conversation] ElevenLabs error:', message);
+          console.error('VOICE: ElevenLabs error:', message);
+          console.error('USER_AUDIO_INPUT_ERROR: ElevenLabs session error', message);
           setIsSessionActive(false);
           setConversationState('idle');
         },
         onModeChange: ({ mode }) => {
+          console.log('VOICE: ElevenLabs mode changed to', mode);
+          
+          // Log specifically when entering listening mode (mic should be active)
+          if (mode === 'listening') {
+            console.log('VOICE: ElevenLabs confirms listening mode - mic input should be active');
+            console.log('VOICE: setting UI to listening state');
+          } else if (mode === 'speaking') {
+            console.log('VOICE: ElevenLabs speaking - mic input temporarily disabled');
+          }
+          
           setElevenLabsMode(mode);
           setConversationState(mode === 'listening' ? 'listening' : mode === 'speaking' ? 'speaking' : 'thinking');
         },
         onMessage: ({ message, source }) => {
+          console.log('VOICE: message received', { message, source, messageLength: message.length });
+          
+          if (source === 'user') {
+            console.log('USER_TRANSCRIPT_EVENT: user spoke', message);
+            console.log('VOICE: user transcript:', message);
+          } else {
+            console.log('VOICE: agent response:', message);
+          }
           // Reset inactivity timeout on any message
           startInactivityTimeout();
           
           // Add transcript turn to session storage
           const speaker = source === 'user' ? 'user' : 'agent';
-          const newTurn = sessionManager.addTranscriptTurn(sessionId, speaker, message);
+          
+          let newTurn;
+          if (sessionId) {
+            console.log('VOICE: adding transcript to session', { sessionId, speaker });
+            newTurn = sessionManager.addTranscriptTurn(sessionId, speaker, message);
+          } else if (setupId) {
+            console.log('VOICE: adding transcript to setup conversation', { setupId, speaker });
+            newTurn = sessionManager.addSetupTranscriptTurn(setupId, speaker, message);
+          } else {
+            console.error('VOICE: no sessionId or setupId to add transcript to');
+            return;
+          }
+          
           setTranscript(prev => [...prev, newTurn]);
-          console.log('📝 TRANSCRIPT_TURN_ADDED', { 
+          console.log('VOICE: transcript turn added', { 
             speaker, 
             turnId: newTurn.id, 
             text: message,
-            sessionId 
+            sessionId,
+            setupId
           });
           
           // Check for user decline phrases
@@ -225,12 +313,43 @@ export function Conversation() {
       });
       
       conversationRef.current = conversation;
+      console.log("VOICE: session started successfully", conversation);
+      
+      // Check if conversation is properly configured for input
+      console.log("VOICE: checking conversation configuration", {
+        conversationObject: !!conversation,
+        hasOnMessage: !!conversation.onMessage,
+        hasOnModeChange: !!conversation.onModeChange
+      });
+      
+      // Check if conversation is immediately ready for input
+      setTimeout(() => {
+        console.log("VOICE: conversation status after 1 second", {
+          isListening: conversationState === 'listening',
+          elevenLabsMode,
+          conversationState,
+          isSessionActive
+        });
+        
+        if (conversationState === 'listening') {
+          console.log("VOICE: UI shows listening - mic should be capturing audio");
+        } else {
+          console.log("VOICE: UI not in listening state - mic may not be active");
+        }
+      }, 1000);
     } catch (error) {
-      console.error('[Conversation] Failed to start ElevenLabs session:', error);
+      console.error('VOICE: start failed', error);
+      console.error('VOICE: error details', {
+        errorMessage: error.message,
+        errorStack: error.stack,
+        agentId: AGENT_ID
+      });
+      
       setIsSessionActive(false);
       setConversationState('idle');
       
       // Fallback to mock conversation for testing
+      console.log("VOICE: falling back to mock conversation");
       simulateConversation();
     }
   };
@@ -973,17 +1092,39 @@ export function Conversation() {
 
   // Mock conversation simulation - TODO: Replace with real ElevenLabs integration
   const simulateConversation = () => {
-    if (!sessionId) return;
+    console.log("VOICE: simulateConversation called", { sessionId, setupId });
+    
+    if (!sessionId && !setupId) {
+      console.error("VOICE: simulateConversation - no sessionId or setupId");
+      return;
+    }
 
     // Mock initial AI greeting
     setTimeout(() => {
-      const aiTurn = sessionManager.addTranscriptTurn(
-        sessionId,
-        'agent',
-        `Hi there! I understand you wanted to discuss ${session?.scenario.toLowerCase()}. I appreciate you making time for this important conversation. How are you feeling about this topic?`
-      );
-      setTranscript(prev => [...prev, aiTurn]);
+      console.log("VOICE: adding mock AI greeting");
+      
+      let aiTurn;
+      if (sessionId) {
+        aiTurn = sessionManager.addTranscriptTurn(
+          sessionId,
+          'agent',
+          `Hi there! I understand you wanted to discuss ${session?.scenario.toLowerCase()}. I appreciate you making time for this important conversation. How are you feeling about this topic?`
+        );
+      } else if (setupId) {
+        aiTurn = sessionManager.addSetupTranscriptTurn(
+          setupId,
+          'agent',
+          'What conversation do you need to rehearse?'
+        );
+      }
+      
+      if (aiTurn) {
+        setTranscript(prev => [...prev, aiTurn]);
+        console.log("VOICE: mock AI greeting added", aiTurn);
+      }
+      
       setConversationState('listening');
+      console.log("VOICE: mock conversation ready for input");
     }, 2000);
   };
 
@@ -1265,37 +1406,6 @@ export function Conversation() {
             )}
           </div>
 
-          {/* Setup conversation readiness bar */}
-          {setupConversation && getUserScenarioFromTranscript(setupConversation.clarificationTranscript) && (
-            <div className="border-t border-border bg-card/50 p-4">
-              <div className={`mx-auto transition-all duration-300 ${
-                isFeedbackOpen ? 'max-w-3xl' : 'max-w-4xl'
-              }`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                      <Play className="w-3 h-3 text-white" />
-                    </div>
-                    <span className="font-medium text-sm">Ready to start your practice session?</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Button
-                      onClick={() => {
-                        console.log('🚀 SETUP: Start simulation button clicked');
-                        startSimulationFromSetup();
-                      }}
-                      variant="default"
-                      size="sm"
-                      className="bg-green-600 hover:bg-green-700"
-                    >
-                      <Play className="w-4 h-4 mr-2" />
-                      Start simulation
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Conversation completion bar */}
           {currentAttempt?.status === 'complete' && !isGeneratingFeedback && (

@@ -70,6 +70,16 @@ AI has become remarkably good at generating text, but many of the situations peo
 
 The long-term vision is a system that helps people build communication skills through repeated practice, much like language-learning apps help people build fluency through repetition.
 
+##Tech
+
+Rehearse was built using:
+
+* ElevenLabs Conversational AI for real-time voice conversations
+* React and TypeScript for the web application
+* Vite for frontend tooling
+* Local session persistence for conversation history and reports
+* LLM-powered conversation simulation and feedback generation
+
 ## Built For
 
 Rebuild X ElevenLabs Hackathon 2026

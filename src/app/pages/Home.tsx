@@ -1,37 +1,39 @@
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router';
 import { VoiceOrb } from '../components/VoiceOrb';
-import { sessionStorage } from '../../../lib/session';
+import { createSession } from '../../../lib/sessions';
 
 const examples = [
-  "I need to tell my cofounder a major deal fell through.",
-  "I need to end a relationship without hurting them.",
-  "I need to ask for a raise.",
+  "I need to tell my cofounder the deal fell through and runway is tight.",
+  "I need to tell my partner I don't think we should keep dating.",
 ];
 
 export function Home() {
   const navigate = useNavigate();
 
   const handleExampleClick = (example: string) => {
-    navigate('/setup/custom', { state: { customScenario: example } });
+    console.log('EXAMPLE_CLICKED', example);
+    
+    // Create a new session and go directly to conversation
+    const session = createSession(example);
+    console.log('SESSION_CREATED_FROM_EXAMPLE', session);
+    
+    // Navigate directly to conversation
+    const route = `/conversation/${session.id}`;
+    console.log('NAVIGATING_TO', route);
+    navigate(route);
   };
 
   const handleStartNewRehearsal = () => {
     console.log('HOME_CIRCLE_CLICKED');
     
-    // Create a new session immediately
-    const session = sessionStorage.createSession(
-      'New rehearsal',
-      '', // role will be determined during intake
-      '', // goal will be determined during intake  
-      ''  // worry will be determined during intake
+    // Create a new session for intake
+    const session = createSession(
+      'What difficult conversation are you avoiding today?'
     );
-    
-    // Update session to intake phase
-    sessionStorage.updateSession(session.id, { phase: 'intake' });
     console.log('SESSION_CREATED_HOME', session);
     
-    // Navigate immediately to conversation
+    // Navigate immediately to conversation for intake
     const route = `/conversation/${session.id}`;
     console.log('NAVIGATING_TO_HOME', route);
     navigate(route);

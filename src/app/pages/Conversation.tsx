@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { useNavigate, useParams } from 'react-router';
 import { Button } from '../components/Button';
-import { sessionStorage, Session, RehearsalAttempt, Message, Annotation, KeyMoment, AudioAnalysis, FeedbackReport } from '../../../lib/session';
+import { getSession, updateSession, sessionManager, type RehearsalSession, type RehearsalAttempt, type TranscriptTurn, type AudioAnalysis, type FeedbackReport } from '../../../lib/sessions';
 import { SimpleVoiceOrb } from '../components/SimpleVoiceOrb';
 import { Conversation as ElevenLabsConversation } from '@11labs/client';
 import type { Mode, Status } from '@11labs/client';
@@ -16,9 +16,9 @@ type ConversationState = 'idle' | 'listening' | 'thinking' | 'speaking';
 export function Conversation() {
   const navigate = useNavigate();
   const { sessionId } = useParams<{ sessionId: string }>();
-  const [session, setSession] = useState<Session | null>(null);
+  const [session, setSession] = useState<RehearsalSession | null>(null);
   const [currentAttempt, setCurrentAttempt] = useState<RehearsalAttempt | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [transcript, setTranscript] = useState<TranscriptTurn[]>([]);
   const [conversationState, setConversationState] = useState<ConversationState>('idle');
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [elevenLabsMode, setElevenLabsMode] = useState<Mode>('listening');
@@ -37,7 +37,7 @@ export function Conversation() {
       return;
     }
 
-    const sessionData = sessionStorage.getSession(sessionId);
+    const sessionData = getSession(sessionId);
     if (!sessionData) {
       navigate('/');
       return;
@@ -46,18 +46,19 @@ export function Conversation() {
     setSession(sessionData);
     
     // Get current attempt
-    const currentAttemptData = sessionStorage.getCurrentAttempt(sessionId);
+    const currentAttemptData = sessionManager.getCurrentAttempt(sessionId);
     setCurrentAttempt(currentAttemptData);
-    setMessages(currentAttemptData ? currentAttemptData.messages : []);
+    setTranscript(currentAttemptData ? currentAttemptData.transcript : []);
     
-    // Add initial intake message if this is a new intake session
-    if (sessionData.phase === 'intake' && (!currentAttemptData || currentAttemptData.messages.length === 0)) {
-      const initialMessage = sessionStorage.addMessage(
+    // Add initial intake message if this is a new session with no transcript
+    if (sessionData.scenario === 'What difficult conversation are you avoiding today?' && 
+        (!currentAttemptData || currentAttemptData.transcript.length === 0)) {
+      const initialTurn = sessionManager.addTranscriptTurn(
         sessionId,
-        'assistant',
+        'agent',
         'What conversation do you need to rehearse?'
       );
-      setMessages([initialMessage]);
+      setTranscript([initialTurn]);
       
       // Auto-start conversation immediately
       setTimeout(() => {
@@ -67,9 +68,9 @@ export function Conversation() {
   }, [sessionId, navigate]);
 
   useEffect(() => {
-    // Scroll to bottom when new messages arrive
+    // Scroll to bottom when new transcript turns arrive
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [transcript]);
 
   const handleStartConversation = async () => {
     if (!sessionId) return;
@@ -105,26 +106,26 @@ export function Conversation() {
           setConversationState(mode === 'listening' ? 'listening' : mode === 'speaking' ? 'speaking' : 'thinking');
         },
         onMessage: ({ message, source }) => {
-          // Add message to session storage
-          const role = source === 'user' ? 'user' : 'assistant';
-          const newMessage = sessionStorage.addMessage(sessionId, role, message);
-          setMessages(prev => [...prev, newMessage]);
-          console.log('📝 USER_MESSAGE_FINALIZED', { 
-            role, 
-            messageId: newMessage.id, 
+          // Add transcript turn to session storage
+          const speaker = source === 'user' ? 'user' : 'agent';
+          const newTurn = sessionManager.addTranscriptTurn(sessionId, speaker, message);
+          setTranscript(prev => [...prev, newTurn]);
+          console.log('📝 TRANSCRIPT_TURN_ADDED', { 
+            speaker, 
+            turnId: newTurn.id, 
             text: message,
             sessionId 
           });
           
           // Check for user decline phrases
-          if (role === 'user') {
+          if (speaker === 'user') {
             checkForUserDecline(message);
           }
           
           // No live coaching during active conversation
           
           // Handle intake flow progression
-          if (role === 'user' && session?.phase === 'intake') {
+          if (speaker === 'user' && session?.scenario === 'What difficult conversation are you avoiding today?') {
             handleIntakeResponse(message);
           }
         }
@@ -408,65 +409,43 @@ export function Conversation() {
   const handleIntakeResponse = (userMessage: string) => {
     if (!sessionId || !session) return;
     
-    // Extract conversation topic and update session title
-    const lowerMessage = userMessage.toLowerCase();
-    
-    // Simple title extraction - take first 50 chars and clean up
-    let newTitle = userMessage;
-    if (userMessage.startsWith('I need to ')) {
-      newTitle = userMessage.substring(10); // Remove "I need to "
-    }
-    newTitle = newTitle.charAt(0).toUpperCase() + newTitle.slice(1);
-    if (newTitle.length > 50) {
-      newTitle = newTitle.substring(0, 47) + '...';
-    }
-    
-    // Try to infer the conversation partner
-    let inferredRole = '';
-    const roleKeywords = {
-      'cofounder': ['cofounder', 'co-founder', 'business partner'],
-      'manager': ['manager', 'boss', 'supervisor'],
-      'partner': ['partner', 'girlfriend', 'boyfriend', 'spouse', 'wife', 'husband'],
-      'friend': ['friend'],
-      'parent': ['mom', 'dad', 'mother', 'father', 'parent'],
-      'investor': ['investor', 'VC', 'venture capital']
+    // Update session with the user's scenario
+    const updatedSession = { 
+      ...session, 
+      scenario: userMessage,
+      title: userMessage.length > 50 ? userMessage.substring(0, 47) + '...' : userMessage
     };
     
-    for (const [role, keywords] of Object.entries(roleKeywords)) {
-      if (keywords.some(keyword => lowerMessage.includes(keyword))) {
-        inferredRole = role;
-        break;
-      }
-    }
+    updateSession(updatedSession);
+    setSession(updatedSession);
     
-    // Update session with new info
-    sessionStorage.updateSession(sessionId, { 
-      scenario: newTitle,
-      role: inferredRole
+    console.log('[Conversation] Updated session with user scenario:', { 
+      scenario: userMessage,
+      title: updatedSession.title 
     });
-    
-    // Update local session state
-    setSession(prev => prev ? { 
-      ...prev, 
-      scenario: newTitle, 
-      role: inferredRole 
-    } : null);
-    
-    console.log('[Conversation] Updated session:', { newTitle, inferredRole });
   };
 
   const generateFeedbackReport = async (audioBlob: Blob | null) => {
-    if (!sessionId || !session || messages.length === 0) return;
+    if (!sessionId || !session || transcript.length === 0) return;
     
     console.log('🎤 GENERATING_FEEDBACK_REPORT', { 
       sessionId, 
-      messagesCount: messages.length,
+      transcriptLength: transcript.length,
       hasAudio: !!audioBlob 
     });
     
     setIsGeneratingFeedback(true);
     
     try {
+      // Convert transcript to message format for audio analysis service
+      const messages = transcript.map(turn => ({
+        id: turn.id,
+        sessionId,
+        role: turn.speaker === 'user' ? 'user' as const : 'assistant' as const,
+        text: turn.text,
+        timestamp: new Date(turn.timestamp).getTime()
+      }));
+      
       // Step 1: Analyze audio if available
       let audioAnalysis: AudioAnalysis | null = null;
       if (audioBlob) {
@@ -483,21 +462,15 @@ export function Conversation() {
       );
       
       // Step 3: Store results in the attempt
-      const updatedAttempt = sessionStorage.getCurrentAttempt(sessionId);
-      if (updatedAttempt && feedbackReport) {
-        updatedAttempt.audioAnalysis = audioAnalysis || undefined;
-        updatedAttempt.feedbackReport = feedbackReport;
+      if (feedbackReport) {
+        sessionManager.completeAttempt(sessionId, feedbackReport, audioAnalysis || undefined);
         
         // Update local state
+        const updatedSession = getSession(sessionId);
+        const updatedAttempt = sessionManager.getCurrentAttempt(sessionId);
+        
+        setSession(updatedSession);
         setCurrentAttempt(updatedAttempt);
-        setSession(prev => prev ? {
-          ...prev,
-          attempts: prev.attempts.map(attempt => 
-            attempt.id === prev.currentAttemptId
-              ? { ...attempt, audioAnalysis, feedbackReport }
-              : attempt
-          )
-        } : null);
         
         console.log('🎤 FEEDBACK_REPORT_COMPLETE', {
           audioAnalysis: audioAnalysis?.primaryEmotion,
@@ -533,27 +506,21 @@ export function Conversation() {
       setIsRecording(false);
     }
     
-    // Update attempt status to completed using centralized function
-    sessionStorage.endCurrentAttempt(sessionId);
-    
-    // Store audio recording if available
-    if (audioBlob && currentAttempt) {
-      // Note: In a real app, you'd store this in a more persistent way
-      currentAttempt.audioRecording = audioBlob;
-    }
-    
-    // Update local state
-    const updatedSession = sessionStorage.getSession(sessionId);
-    const updatedAttempt = sessionStorage.getCurrentAttempt(sessionId);
-    
-    setSession(updatedSession);
-    setCurrentAttempt(updatedAttempt);
-    
     // Generate feedback report with audio analysis
     await generateFeedbackReport(audioBlob);
     
-    // Then generate annotations (communication moment analysis)
-    await generateAnnotations();
+    // Update session status to completed
+    if (session) {
+      session.status = 'complete';
+      updateSession(session);
+    }
+    
+    // Update local state
+    const updatedSession = getSession(sessionId);
+    const updatedAttempt = sessionManager.getCurrentAttempt(sessionId);
+    
+    setSession(updatedSession);
+    setCurrentAttempt(updatedAttempt);
   };
 
   const handleEndConversation = () => {
@@ -571,14 +538,14 @@ export function Conversation() {
     console.log('🔄 CREATING_NEW_ATTEMPT', { sessionId });
     
     // Create a new attempt within the same session
-    const newAttempt = sessionStorage.createNewAttempt(sessionId);
+    const newAttempt = sessionManager.createNewAttempt(sessionId);
     
     if (newAttempt) {
       // Update local state with new attempt
-      const updatedSession = sessionStorage.getSession(sessionId);
+      const updatedSession = getSession(sessionId);
       setSession(updatedSession);
       setCurrentAttempt(newAttempt);
-      setMessages([]);
+      setTranscript([]);
       setShowKeyMoments(false);
       
       // Reset conversation state for new attempt
@@ -652,11 +619,11 @@ export function Conversation() {
   };
 
   const calculateDuration = () => {
-    if (!session || messages.length === 0) return '0s';
+    if (!session || transcript.length === 0) return '0s';
     
-    const firstMessage = messages[0];
-    const lastMessage = messages[messages.length - 1];
-    const durationMs = lastMessage.timestamp - firstMessage.timestamp;
+    const firstTurn = transcript[0];
+    const lastTurn = transcript[transcript.length - 1];
+    const durationMs = new Date(lastTurn.timestamp).getTime() - new Date(firstTurn.timestamp).getTime();
     
     const minutes = Math.floor(durationMs / 60000);
     const seconds = Math.floor((durationMs % 60000) / 1000);
@@ -673,12 +640,12 @@ export function Conversation() {
 
     // Mock initial AI greeting
     setTimeout(() => {
-      const aiMessage = sessionStorage.addMessage(
+      const aiTurn = sessionManager.addTranscriptTurn(
         sessionId,
-        'assistant',
+        'agent',
         `Hi there! I understand you wanted to discuss ${session?.scenario.toLowerCase()}. I appreciate you making time for this important conversation. How are you feeling about this topic?`
       );
-      setMessages(prev => [...prev, aiMessage]);
+      setTranscript(prev => [...prev, aiTurn]);
       setConversationState('listening');
     }, 2000);
   };
@@ -686,11 +653,11 @@ export function Conversation() {
   const handleMockUserInput = (text: string) => {
     if (!sessionId) return;
     
-    const userMessage = sessionStorage.addMessage(sessionId, 'user', text);
-    setMessages(prev => [...prev, userMessage]);
+    const userTurn = sessionManager.addTranscriptTurn(sessionId, 'user', text);
+    setTranscript(prev => [...prev, userTurn]);
     
-    console.log('📝 USER_MESSAGE_FINALIZED (MOCK)', { 
-      messageId: userMessage.id, 
+    console.log('📝 TRANSCRIPT_TURN_ADDED (MOCK)', { 
+      turnId: userTurn.id, 
       text,
       sessionId 
     });
@@ -701,7 +668,7 @@ export function Conversation() {
     // No live coaching during conversation
     
     // Handle intake response for mock too
-    if (session?.phase === 'intake') {
+    if (session?.scenario === 'What difficult conversation are you avoiding today?') {
       handleIntakeResponse(text);
     }
     
@@ -711,7 +678,7 @@ export function Conversation() {
     setTimeout(() => {
       let responses: string[];
       
-      if (session?.phase === 'intake') {
+      if (session?.scenario === 'What difficult conversation are you avoiding today?') {
         responses = [
           "That sounds important. Who do you need to have this conversation with?",
           "I understand. What outcome are you hoping for from this conversation?",
@@ -727,12 +694,12 @@ export function Conversation() {
         ];
       }
       
-      const aiMessage = sessionStorage.addMessage(
+      const aiTurn = sessionManager.addTranscriptTurn(
         sessionId,
-        'assistant',
+        'agent',
         responses[Math.floor(Math.random() * responses.length)]
       );
-      setMessages(prev => [...prev, aiMessage]);
+      setTranscript(prev => [...prev, aiTurn]);
       setConversationState('listening');
     }, 1500);
   };
@@ -768,10 +735,10 @@ export function Conversation() {
             <div>
               <h1 className="text-lg font-medium">{session.scenario}</h1>
               <p className="text-sm text-muted-foreground">
-                {session.phase === 'intake' 
+                {session.scenario === 'What difficult conversation are you avoiding today?' 
                   ? 'Tell Rehearse what conversation you need to practice.'
-                  : session.role 
-                    ? `Conversation with ${session.role}`
+                  : session.characterRole 
+                    ? `Conversation with ${session.characterRole}`
                     : 'Conversation practice'
                 }
               </p>
@@ -821,7 +788,7 @@ export function Conversation() {
                     Duration: {calculateDuration()}
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    Messages: {messages.length}
+                    Messages: {transcript.length}
                   </div>
                 </div>
               ) : null}
@@ -835,7 +802,7 @@ export function Conversation() {
         {/* Transcript area */}
         <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full">
           <div className="flex-1 overflow-y-auto px-6 py-8">
-            {messages.length === 0 ? (
+            {transcript.length === 0 ? (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center">
                   <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center mx-auto mb-4">
@@ -848,17 +815,17 @@ export function Conversation() {
               </div>
             ) : (
               <div className="space-y-6">
-                {messages.map((message) => (
+                {transcript.map((turn) => (
                   <motion.div
-                    key={message.id}
-                    id={`message-${message.id}`}
+                    key={turn.id}
+                    id={`turn-${turn.id}`}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    className={`flex ${turn.speaker === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
                     <div
                       className={`max-w-[70%] p-4 rounded-2xl ${
-                        message.role === 'user'
+                        turn.speaker === 'user'
                           ? 'bg-foreground text-background ml-4'
                           : 'bg-card border border-border mr-4'
                       }`}
@@ -866,15 +833,15 @@ export function Conversation() {
                       <div className="flex items-start gap-3">
                         <div className="flex-1">
                           <p className="text-sm leading-relaxed">
-                            {message.role === 'assistant' ? cleanAssistantText(message.text) : message.text}
+                            {turn.speaker === 'agent' ? cleanAssistantText(turn.text) : turn.text}
                           </p>
                           <div className="flex items-center justify-between mt-2">
                             <span className={`text-xs ${
-                              message.role === 'user' 
+                              turn.speaker === 'user' 
                                 ? 'text-background/60' 
                                 : 'text-muted-foreground'
                             }`}>
-                              {new Date(message.timestamp).toLocaleTimeString([], {
+                              {new Date(turn.timestamp).toLocaleTimeString([], {
                                 hour: '2-digit',
                                 minute: '2-digit'
                               })}
@@ -883,26 +850,6 @@ export function Conversation() {
                         </div>
                       </div>
                     </div>
-                    
-                    {/* Post-debrief annotation for user messages */}
-                    {message.role === 'user' && message.hasAnnotation && currentAttempt?.debriefComplete && (() => {
-                      const annotation = currentAttempt.annotations.find(a => a.messageId === message.id);
-                      return annotation ? (
-                        <motion.div
-                          initial={{ opacity: 0, y: 5 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.2 }}
-                          className={`ml-4 mr-[30%] mt-2 ${
-                            highlightedMessageId === message.id ? 'ring-2 ring-blue-300' : ''
-                          }`}
-                        >
-                          <div className="bg-amber-50 border-l-4 border-amber-200 p-3 rounded-r-lg">
-                            <h4 className="text-amber-800 text-sm font-medium">{annotation.title}</h4>
-                            <p className="text-sm text-amber-700 mt-1">{annotation.body}</p>
-                          </div>
-                        </motion.div>
-                      ) : null;
-                    })()}
                   </motion.div>
                 ))}
                 <div ref={messagesEndRef} />

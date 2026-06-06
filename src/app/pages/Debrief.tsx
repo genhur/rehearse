@@ -3,12 +3,12 @@ import { motion } from 'motion/react';
 import { useNavigate, useParams } from 'react-router';
 import { Button } from '../components/Button';
 import { ArrowRight, Mic, Play, Home } from 'lucide-react';
-import { sessionStorage, Session, RehearsalAttempt, FeedbackReport, AudioAnalysis } from '../../../lib/session';
+import { getSession, sessionManager, type RehearsalSession, type RehearsalAttempt, type FeedbackReport, type AudioAnalysis } from '../../../lib/sessions';
 
 export function Debrief() {
   const navigate = useNavigate();
   const { sessionId } = useParams<{ sessionId: string }>();
-  const [session, setSession] = useState<Session | null>(null);
+  const [session, setSession] = useState<RehearsalSession | null>(null);
   const [currentAttempt, setCurrentAttempt] = useState<RehearsalAttempt | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -20,14 +20,14 @@ export function Debrief() {
         return;
       }
 
-      const sessionData = sessionStorage.getSession(sessionId);
+      const sessionData = getSession(sessionId);
       if (!sessionData) {
         setError('Session not found. Please start a new conversation.');
         setLoading(false);
         return;
       }
 
-      const attemptData = sessionStorage.getCurrentAttempt(sessionId);
+      const attemptData = sessionManager.getCurrentAttempt(sessionId);
       if (!attemptData || !attemptData.feedbackReport) {
         setError('No feedback report available. Complete a conversation to see analysis.');
         setLoading(false);
@@ -96,7 +96,7 @@ export function Debrief() {
           </div>
           <p className="text-lg text-muted-foreground mb-2">{session.scenario}</p>
           <p className="text-sm text-muted-foreground">
-            Attempt {currentAttempt.attemptNumber} · {currentAttempt.messages.length} messages
+            Attempt {currentAttempt.attemptNumber} · {currentAttempt.transcript.length} messages
             {audioAnalysis && ` · Audio analyzed`}
           </p>
         </motion.div>

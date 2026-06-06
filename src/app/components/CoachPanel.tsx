@@ -23,6 +23,14 @@ export function CoachPanel({
 }: CoachPanelProps) {
   const [showAllNotes, setShowAllNotes] = useState(false);
 
+  console.log('🎯 COACH_PANEL_RENDERED', {
+    isOpen,
+    latestNote: latestNote?.id,
+    allNotesCount: allNotes.length,
+    isConversationActive,
+    allNotes: allNotes.map(n => ({ id: n.id, text: n.text, messageId: n.messageId }))
+  });
+
   const getSeverityColor = (severity: CoachNote['severity']) => {
     switch (severity) {
       case 'positive': return 'border-green-200 bg-green-50';

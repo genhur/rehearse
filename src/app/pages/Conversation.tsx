@@ -102,11 +102,19 @@ export function Conversation() {
           const role = source === 'user' ? 'user' : 'assistant';
           const newMessage = sessionStorage.addMessage(sessionId, role, message);
           setMessages(prev => [...prev, newMessage]);
-          console.log('[Conversation] New message:', { role, message });
+          console.log('📝 USER_MESSAGE_FINALIZED', { 
+            role, 
+            messageId: newMessage.id, 
+            text: message,
+            sessionId 
+          });
           
           // Handle live coaching for user messages
           if (role === 'user' && session) {
+            console.log('🎯 TRIGGERING_LIVE_COACHING', { messageId: newMessage.id });
             handleLiveCoaching(newMessage);
+          } else {
+            console.log('🎯 SKIPPING_LIVE_COACHING', { role, hasSession: !!session });
           }
           
           // Handle intake flow progression
@@ -128,7 +136,10 @@ export function Conversation() {
   };
 
   const handleLiveCoaching = async (userMessage: Message) => {
-    if (!session || !sessionId) return;
+    if (!session || !sessionId) {
+      console.log('🎯 COACH_ANALYSIS_SKIPPED', { hasSession: !!session, hasSessionId: !!sessionId });
+      return;
+    }
     
     // Get recent messages for context
     const recentMessages = messages.slice(-4); // Last 4 messages including this one
@@ -144,13 +155,26 @@ export function Conversation() {
       }
     };
     
+    console.log('🎯 COACH_ANALYSIS_STARTING', {
+      messageId: userMessage.id,
+      messageText: userMessage.text,
+      sessionId,
+      currentCoachNotes: coachNotes.length
+    });
+    
     try {
       const note = await liveCoachingService.analyzeMessage(coachingRequest);
       if (note) {
+        console.log('🎯 COACH_NOTE_RECEIVED', note);
+        
         // Update messages state to include coach note flag
-        setMessages(prev => prev.map(m => 
-          m.id === userMessage.id ? { ...m, hasCoachNote: true } : m
-        ));
+        setMessages(prev => {
+          const updated = prev.map(m => 
+            m.id === userMessage.id ? { ...m, hasCoachNote: true } : m
+          );
+          console.log('🎯 COACH_NOTE_ATTACHED_TO_MESSAGE', { messageId: userMessage.id, updated });
+          return updated;
+        });
         
         // Update session storage with the coach note flag
         const currentSession = sessionStorage.getSession(sessionId);
@@ -159,17 +183,24 @@ export function Conversation() {
             m.id === userMessage.id ? { ...m, hasCoachNote: true } : m
           );
           sessionStorage.updateSession(sessionId, { messages: updatedMessages });
+          console.log('🎯 COACH_NOTE_SAVED_TO_STORAGE', { messageId: userMessage.id });
         }
         
-        setCoachNotes(prev => [...prev, note]);
+        setCoachNotes(prev => {
+          const newNotes = [...prev, note];
+          console.log('🎯 COACH_PANEL_NOTE_COUNT', { 
+            previousCount: prev.length, 
+            newCount: newNotes.length 
+          });
+          return newNotes;
+        });
         
-        // Auto-open coach panel on first note
-        if (coachNotes.length === 0) {
-          setIsCoachPanelOpen(true);
-        }
+        // Don't auto-open coach panel - inline notes are primary now
+      } else {
+        console.log('🎯 COACH_ANALYSIS_NO_NOTE_RETURNED');
       }
     } catch (error) {
-      console.error('[LiveCoaching] Failed to analyze message:', error);
+      console.error('🎯 COACH_ANALYSIS_ERROR:', error);
     }
   };
 
@@ -254,6 +285,68 @@ export function Conversation() {
     navigate('/');
   };
 
+  const cleanAssistantText = (text: string): string => {
+    return text
+      // Remove XML-like tags like <Cofounder>, <Manager>, etc.
+      .replace(/<[^>]+>/g, '')
+      // Remove emotional stage directions in brackets like [stunned], [concerned], etc.
+      .replace(/\[[^\]]+\]/g, '')
+      // Clean up any double spaces
+      .replace(/\s+/g, ' ')
+      // Trim whitespace
+      .trim();
+  };
+
+  const handleAddTestCoachNote = () => {
+    if (!sessionId) return;
+    
+    // Get the latest user message
+    const userMessages = messages.filter(m => m.role === 'user');
+    if (userMessages.length === 0) return;
+    
+    const latestUserMessage = userMessages[userMessages.length - 1];
+    
+    console.log('🎯 ADDING_TEST_COACH_NOTE', {
+      messageId: latestUserMessage.id,
+      messageText: latestUserMessage.text
+    });
+    
+    const testNote = {
+      id: `note_test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      messageId: latestUserMessage.id,
+      sessionId,
+      type: 'vague_response' as any,
+      severity: 'neutral' as any,
+      text: `You said "${latestUserMessage.text.slice(0, 30)}..." without giving specifics when they likely need concrete details.`,
+      suggestion: 'Try: "We have exactly 8 weeks of runway left based on current burn rate."',
+      createdAt: Date.now()
+    };
+    
+    // Add note to coaching service
+    liveCoachingService.addCoachNotePublic(sessionId, testNote);
+    
+    // Update messages state to include coach note flag
+    setMessages(prev => prev.map(m => 
+      m.id === latestUserMessage.id ? { ...m, hasCoachNote: true } : m
+    ));
+    
+    // Update session storage with the coach note flag
+    const currentSession = sessionStorage.getSession(sessionId);
+    if (currentSession) {
+      const updatedMessages = currentSession.messages.map(m =>
+        m.id === latestUserMessage.id ? { ...m, hasCoachNote: true } : m
+      );
+      sessionStorage.updateSession(sessionId, { messages: updatedMessages });
+    }
+    
+    // Update coach notes state
+    setCoachNotes(prev => [...prev, testNote]);
+    
+    // Don't auto-open panel - inline note will show
+    
+    console.log('🎯 TEST_COACH_NOTE_ADDED', testNote);
+  };
+
   const calculateDuration = () => {
     if (!session || messages.length === 0) return '0s';
     
@@ -292,8 +385,15 @@ export function Conversation() {
     const userMessage = sessionStorage.addMessage(sessionId, 'user', text);
     setMessages(prev => [...prev, userMessage]);
     
+    console.log('📝 USER_MESSAGE_FINALIZED (MOCK)', { 
+      messageId: userMessage.id, 
+      text,
+      sessionId 
+    });
+    
     // Handle live coaching for mock messages
     if (session) {
+      console.log('🎯 TRIGGERING_LIVE_COACHING (MOCK)', { messageId: userMessage.id });
       handleLiveCoaching(userMessage);
     }
     
@@ -386,8 +486,8 @@ export function Conversation() {
                 </span>
               </div>
               
-              {/* Desktop coach toggle */}
-              {coachNotes.length > 0 && (
+              {/* Desktop coach toggle - secondary to inline notes */}
+              {coachNotes.length > 1 && (
                 <div className="hidden md:block">
                   <Button
                     onClick={() => setIsCoachPanelOpen(!isCoachPanelOpen)}
@@ -396,7 +496,7 @@ export function Conversation() {
                     className="flex items-center gap-2"
                   >
                     <MessageCircle className="w-4 h-4" />
-                    Coach ({coachNotes.length})
+                    Coach History ({coachNotes.length})
                   </Button>
                 </div>
               )}
@@ -461,7 +561,9 @@ export function Conversation() {
                     >
                       <div className="flex items-start gap-3">
                         <div className="flex-1">
-                          <p className="text-sm leading-relaxed">{message.text}</p>
+                          <p className="text-sm leading-relaxed">
+                            {message.role === 'assistant' ? cleanAssistantText(message.text) : message.text}
+                          </p>
                           <div className="flex items-center justify-between mt-2">
                             <span className={`text-xs ${
                               message.role === 'user' 
@@ -473,27 +575,35 @@ export function Conversation() {
                                 minute: '2-digit'
                               })}
                             </span>
-                            {message.hasCoachNote && (
-                              <button
-                                onClick={() => {
-                                  setHighlightedMessageId(message.id);
-                                  setIsCoachPanelOpen(true);
-                                }}
-                                className={`text-xs px-2 py-1 rounded-full transition-all ${
-                                  highlightedMessageId === message.id
-                                    ? 'bg-blue-100 text-blue-700'
-                                    : message.role === 'user'
-                                      ? 'bg-background/10 text-background/70 hover:bg-background/20'
-                                      : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
-                                }`}
-                              >
-                                💡 Coach note
-                              </button>
-                            )}
                           </div>
                         </div>
                       </div>
                     </div>
+                    
+                    {/* Inline coach note for user messages */}
+                    {message.role === 'user' && message.hasCoachNote && (() => {
+                      const coachNote = coachNotes.find(note => note.messageId === message.id);
+                      return coachNote ? (
+                        <motion.div
+                          initial={{ opacity: 0, y: 5 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.2 }}
+                          className="ml-4 mr-[30%] mt-2"
+                        >
+                          <div className="bg-blue-50 border-l-4 border-blue-200 p-3 rounded-r-lg">
+                            <div className="flex items-start gap-2">
+                              <span className="text-blue-600 text-sm font-medium">Coach</span>
+                            </div>
+                            <p className="text-sm text-gray-700 mt-1 italic">"{coachNote.text}"</p>
+                            {coachNote.suggestion && (
+                              <p className="text-sm text-blue-700 mt-2">
+                                <span className="font-medium">Try:</span> "{coachNote.suggestion}"
+                              </p>
+                            )}
+                          </div>
+                        </motion.div>
+                      ) : null;
+                    })()}
                   </motion.div>
                 ))}
                 <div ref={messagesEndRef} />
@@ -554,7 +664,7 @@ export function Conversation() {
               </div>
               
               {/* Mock input for testing */}
-              <div className="mt-6 flex gap-2 justify-center">
+              <div className="mt-6 flex gap-2 justify-center flex-wrap">
                 <Button
                   size="sm"
                   variant="outline"
@@ -569,6 +679,17 @@ export function Conversation() {
                 >
                   Mock: Transparent
                 </Button>
+                {/* Debug test coach note button - dev only */}
+                {import.meta.env.DEV && (
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={handleAddTestCoachNote}
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    🧪 Add Test Coach Note
+                  </Button>
+                )}
               </div>
             </div>
           )}

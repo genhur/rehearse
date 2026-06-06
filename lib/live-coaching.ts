@@ -1,14 +1,13 @@
 import { Message } from './session';
 
 export type CoachNoteType = 
-  | 'softened_ask'
-  | 'over_apologized' 
   | 'avoided_answer'
   | 'stayed_regulated'
   | 'strong_moment'
-  | 'unclear_boundary'
   | 'missed_opportunity'
-  | 'direct_clear_ask';
+  | 'direct_clear_ask'
+  | 'vague_response'
+  | 'acknowledged_concern';
 
 export type CoachNoteSeverity = 'positive' | 'neutral' | 'important';
 
@@ -39,19 +38,31 @@ class LiveCoachingService {
   private coachNotes = new Map<string, CoachNote[]>(); // sessionId -> notes[]
   
   async analyzeMessage(request: CoachingRequest): Promise<CoachNote | null> {
+    console.log('🎯 COACH_ANALYSIS_REQUESTED', {
+      sessionId: request.sessionId,
+      messageId: request.latestUserMessage.id,
+      messageText: request.latestUserMessage.text,
+      messageRole: request.latestUserMessage.role
+    });
+    
     // Debounce analysis - only analyze after user stops "speaking"
     const debounceKey = `${request.sessionId}_${request.latestUserMessage.id}`;
     
     if (this.analysisQueue.has(debounceKey)) {
       clearTimeout(this.analysisQueue.get(debounceKey)!);
+      console.log('🎯 COACH_ANALYSIS_DEBOUNCED', { debounceKey });
     }
     
     return new Promise((resolve) => {
       const timeout = setTimeout(async () => {
         this.analysisQueue.delete(debounceKey);
+        console.log('🎯 COACH_ANALYSIS_EXECUTING', { debounceKey });
         const note = await this.performAnalysis(request);
         if (note) {
           this.addCoachNote(request.sessionId, note);
+          console.log('🎯 COACH_NOTE_CREATED', note);
+        } else {
+          console.log('🎯 COACH_ANALYSIS_NO_NOTE');
         }
         resolve(note);
       }, 1500); // Wait 1.5s after message to analyze
@@ -61,32 +72,59 @@ class LiveCoachingService {
   }
   
   private async performAnalysis(request: CoachingRequest): Promise<CoachNote | null> {
+    console.log('🎯 COACH_ANALYSIS_START', {
+      sessionId: request.sessionId,
+      messageText: request.latestUserMessage.text,
+      recentMessagesCount: request.recentMessages.length
+    });
+    
     const openaiApiKey = import.meta.env.VITE_OPENAI_API_KEY;
     
     if (!openaiApiKey) {
-      console.warn('OpenAI API key not configured for live coaching');
+      console.warn('🎯 COACH_ANALYSIS_NO_API_KEY');
+      
+      // No fallback notes when API key is missing
+      
       return null;
     }
     
-    const systemPrompt = `You are a quiet communication coach observing a live rehearsal. Your job is not to interrupt. Only create a coach note when the user does something meaningfully helpful or meaningfully worth adjusting. Return null most of the time. The note should be specific, brief, and attached to the latest user message.
+    const systemPrompt = `You are a communication coach observing a rehearsal. Create coach notes ONLY for genuinely observable communication patterns. Most messages should receive NO coaching.
 
-Focus on:
-- Clarity and directness
-- Emotional regulation
-- Boundaries and assertiveness  
-- Warmth and empathy
-- Active listening
-- Progress toward conversation goals
+ONLY create notes when you observe:
+- Vague responses when specificity was needed
+- Clear, direct communication in difficult moments
+- Avoiding or deflecting direct questions
+- Strong emotional regulation under pressure
+- Missing opportunities to acknowledge concerns
+- Naming business impact or consequences clearly
+- Moving to explanation before addressing the core issue
 
-Prioritize behavioral observations over generic advice. Be sparse - only note genuinely useful moments.
+NEVER create notes for:
+- Generic filler words or hesitation
+- Normal conversational flow
+- Messages that don't contain significant communication choices
+- Situations where you would give generic advice like "be more confident"
+
+Good examples:
+- "You gave a vague timeline when they asked for specifics"
+- "You stayed calm and clear after they challenged the decision"
+- "You named the financial impact directly here"
+- "You moved to explaining reasons before acknowledging their concern"
+
+Bad examples:
+- "You could be more confident"
+- "Good communication"
+- "You hesitated here"
+
+Reference specific words/phrases from the user's actual message. The note must connect to observable behavior in their text.
 
 Response format (JSON):
 {
   "hasNote": boolean,
-  "type": "softened_ask" | "over_apologized" | "avoided_answer" | "stayed_regulated" | "strong_moment" | "unclear_boundary" | "missed_opportunity" | "direct_clear_ask" | null,
-  "severity": "positive" | "neutral" | "important",
-  "text": "one sentence observation",
-  "suggestion": "optional brief suggestion"
+  "type": "avoided_answer" | "stayed_regulated" | "strong_moment" | "missed_opportunity" | "direct_clear_ask" | "vague_response" | "acknowledged_concern",
+  "severity": "positive" | "neutral" | "important", 
+  "text": "specific observation referencing their actual words",
+  "suggestion": "concrete alternative phrasing if helpful"
 }`;
     
     const recentContext = request.recentMessages
@@ -103,9 +141,14 @@ ${recentContext}
 
 Latest user message: "${request.latestUserMessage.text}"
 
-Should this user message receive a coach note? Remember: be very selective. Most messages should receive no coaching.`;
+Should this user message receive a coach note? Remember: be very selective. Most messages should receive no coaching. Only create notes for genuinely observable communication patterns or missed opportunities.`;
 
     try {
+      console.log('🎯 COACH_ANALYSIS_CALLING_OPENAI', {
+        model: 'gpt-4o-mini',
+        messageText: request.latestUserMessage.text
+      });
+      
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -128,13 +171,17 @@ Should this user message receive a coach note? Remember: be very selective. Most
       }
 
       const result = await response.json();
+      console.log('🎯 COACH_ANALYSIS_RESPONSE', result);
+      
       const analysis = JSON.parse(result.choices[0].message.content);
+      console.log('🎯 COACH_ANALYSIS_PARSED', analysis);
       
       if (!analysis.hasNote || !analysis.type) {
+        console.log('🎯 COACH_ANALYSIS_NO_NOTE_NEEDED');
         return null;
       }
       
-      return {
+      const note = {
         id: `note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         messageId: request.latestUserMessage.id,
         sessionId: request.sessionId,
@@ -145,17 +192,35 @@ Should this user message receive a coach note? Remember: be very selective. Most
         createdAt: Date.now()
       };
       
+      console.log('🎯 COACH_ANALYSIS_NOTE_GENERATED', note);
+      return note;
+      
     } catch (error) {
-      console.error('[LiveCoaching] Analysis failed:', error);
+      console.error('🎯 COACH_ANALYSIS_FAILED:', error);
+      
+      // No fallback notes in production - just log the error
+      
       return null;
     }
   }
   
   private addCoachNote(sessionId: string, note: CoachNote): void {
+    console.log('🎯 COACH_NOTE_ADDING', {
+      sessionId,
+      noteId: note.id,
+      noteText: note.text,
+      messageId: note.messageId
+    });
+    
     if (!this.coachNotes.has(sessionId)) {
       this.coachNotes.set(sessionId, []);
     }
     this.coachNotes.get(sessionId)!.push(note);
+    
+    console.log('🎯 COACH_NOTE_ADDED', {
+      sessionId,
+      totalNotes: this.coachNotes.get(sessionId)!.length
+    });
   }
   
   getCoachNotes(sessionId: string): CoachNote[] {
@@ -172,6 +237,10 @@ Should this user message receive a coach note? Remember: be very selective. Most
     return notes.find(note => note.messageId === messageId) || null;
   }
   
+  addCoachNotePublic(sessionId: string, note: CoachNote): void {
+    this.addCoachNote(sessionId, note);
+  }
+
   clearSession(sessionId: string): void {
     this.coachNotes.delete(sessionId);
     // Clear any pending analysis for this session

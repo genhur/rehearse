@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
-import { useNavigate, useParams } from 'react-router';
+import { useNavigate, useParams, useLocation } from 'react-router';
 import { Button } from '../components/Button';
 import { ArrowRight, User, Target, AlertCircle } from 'lucide-react';
+import { sessionStorage } from '../../../lib/session';
 
 const scenarioTitles: Record<string, string> = {
   'failed-deal': 'Failed Deal with Cofounder',
@@ -25,23 +26,36 @@ const roleOptions = [
 export function ScenarioSetup() {
   const { scenarioId } = useParams<{ scenarioId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [selectedRole, setSelectedRole] = useState<string>('');
   const [goal, setGoal] = useState('');
   const [worry, setWorry] = useState('');
   const [showProfile, setShowProfile] = useState(false);
+
+  // Get custom scenario from location state if coming from Home page
+  const customScenario = location.state?.customScenario;
+  const scenarioTitle = customScenario || scenarioTitles[scenarioId || ''] || 'Custom Scenario';
 
   const handleGenerate = () => {
     setShowProfile(true);
   };
 
   const handleStart = () => {
-    navigate('/simulation', {
-      state: {
-        role: selectedRole,
-        goal,
-        worry,
-      },
-    });
+    console.log('START_CLICKED');
+    
+    // Create a new conversation session
+    const session = sessionStorage.createSession(
+      scenarioTitle,
+      selectedRole,
+      goal,
+      worry
+    );
+    console.log('SESSION_CREATED', session);
+    
+    // Navigate to the conversation page
+    const route = `/conversation/${session.id}`;
+    console.log('NAVIGATING_TO', route);
+    navigate(route);
   };
 
   return (
@@ -54,7 +68,7 @@ export function ScenarioSetup() {
         >
           <h1 className="mb-2">Setup Simulation</h1>
           <p className="text-muted-foreground">
-            {scenarioTitles[scenarioId || ''] || 'Scenario'}
+            {scenarioTitle}
           </p>
         </motion.div>
 

@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router';
 import { VoiceOrb } from '../components/VoiceOrb';
+import { sessionStorage } from '../../../lib/session';
 
 const examples = [
   "I need to tell my cofounder a major deal fell through.",
@@ -13,6 +14,27 @@ export function Home() {
 
   const handleExampleClick = (example: string) => {
     navigate('/setup/custom', { state: { customScenario: example } });
+  };
+
+  const handleStartNewRehearsal = () => {
+    console.log('HOME_CIRCLE_CLICKED');
+    
+    // Create a new session immediately
+    const session = sessionStorage.createSession(
+      'New rehearsal',
+      '', // role will be determined during intake
+      '', // goal will be determined during intake  
+      ''  // worry will be determined during intake
+    );
+    
+    // Update session to intake phase
+    sessionStorage.updateSession(session.id, { phase: 'intake' });
+    console.log('SESSION_CREATED_HOME', session);
+    
+    // Navigate immediately to conversation
+    const route = `/conversation/${session.id}`;
+    console.log('NAVIGATING_TO_HOME', route);
+    navigate(route);
   };
 
   return (
@@ -87,7 +109,7 @@ export function Home() {
           transition={{ delay: 0.28, duration: 1.3, ease: [0.16, 1, 0.3, 1] }}
           style={{ marginBottom: '3.5rem' }}
         >
-          <VoiceOrb />
+          <VoiceOrb onClick={handleStartNewRehearsal} />
         </motion.div>
 
         {/* Example scenarios — whispered thoughts */}

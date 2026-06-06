@@ -2,10 +2,16 @@ import { useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Conversation } from '@11labs/client';
 import type { Mode, Status } from '@11labs/client';
+import { AudioRecorder } from '../../../lib/audio-recorder';
 
 const AGENT_ID = 'agent_4901ktej496kfp1a1kwj03q037ey';
 
 type UIStatus = 'idle' | 'connecting' | 'connected' | 'disconnecting';
+
+interface VoiceOrbProps {
+  onRecordingComplete?: (audioFile: File) => void;
+  onClick?: () => void;
+}
 
 function Ring({
   size,
@@ -38,16 +44,34 @@ function Ring({
   );
 }
 
-export function VoiceOrb() {
+export function VoiceOrb({ onRecordingComplete, onClick }: VoiceOrbProps = {}) {
   const [uiStatus, setUiStatus] = useState<UIStatus>('idle');
   const [mode, setMode] = useState<Mode>('listening');
   const conversationRef = useRef<Conversation | null>(null);
+  const audioRecorderRef = useRef<AudioRecorder | null>(null);
 
   const handleClick = useCallback(async () => {
+    // If custom onClick is provided (like on home page), use that instead
+    if (onClick && uiStatus === 'idle') {
+      onClick();
+      return;
+    }
+
     if (uiStatus === 'connecting' || uiStatus === 'disconnecting') return;
 
     if (uiStatus === 'connected') {
       setUiStatus('disconnecting');
+      
+      // Stop audio recording and get the file
+      if (audioRecorderRef.current?.isRecording()) {
+        try {
+          const audioFile = await audioRecorderRef.current.stopRecording();
+          onRecordingComplete?.(audioFile);
+        } catch (error) {
+          console.error('[Rehearse] Error stopping audio recording:', error);
+        }
+      }
+      
       await conversationRef.current?.endSession();
       conversationRef.current = null;
       setUiStatus('idle');
@@ -56,15 +80,36 @@ export function VoiceOrb() {
 
     setUiStatus('connecting');
     try {
+      // Start audio recording
+      audioRecorderRef.current = new AudioRecorder();
+      await audioRecorderRef.current.startRecording();
+      
       const conversation = await Conversation.startSession({
         agentId: AGENT_ID,
         onConnect: () => setUiStatus('connected'),
-        onDisconnect: () => {
+        onDisconnect: async () => {
+          // Stop recording when conversation disconnects
+          if (audioRecorderRef.current?.isRecording()) {
+            try {
+              const audioFile = await audioRecorderRef.current.stopRecording();
+              onRecordingComplete?.(audioFile);
+            } catch (error) {
+              console.error('[Rehearse] Error stopping audio recording:', error);
+            }
+          }
           conversationRef.current = null;
           setUiStatus('idle');
         },
-        onError: (msg) => {
+        onError: async (msg) => {
           console.error('[Rehearse] ElevenLabs error:', msg);
+          // Stop recording on error
+          if (audioRecorderRef.current?.isRecording()) {
+            try {
+              await audioRecorderRef.current.stopRecording();
+            } catch (error) {
+              console.error('[Rehearse] Error stopping audio recording:', error);
+            }
+          }
           conversationRef.current = null;
           setUiStatus('idle');
         },
@@ -73,9 +118,17 @@ export function VoiceOrb() {
       conversationRef.current = conversation;
     } catch (err) {
       console.error('[Rehearse] Failed to start session:', err);
+      // Stop recording on error
+      if (audioRecorderRef.current?.isRecording()) {
+        try {
+          await audioRecorderRef.current.stopRecording();
+        } catch (error) {
+          console.error('[Rehearse] Error stopping audio recording:', error);
+        }
+      }
       setUiStatus('idle');
     }
-  }, [uiStatus]);
+  }, [uiStatus, onRecordingComplete, onClick]);
 
   const isListening = uiStatus === 'connected' && mode === 'listening';
   const isSpeaking = uiStatus === 'connected' && mode === 'speaking';

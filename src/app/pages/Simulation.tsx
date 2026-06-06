@@ -1,15 +1,20 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useLocation } from 'react-router';
 import { Button } from '../components/Button';
+import { VoiceOrb } from '../components/VoiceOrb';
 
 type SimulationState = 'listening' | 'thinking' | 'speaking';
 
 export function Simulation() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [state, setState] = useState<SimulationState>('listening');
   const [trust, setTrust] = useState(50);
   const [tension, setTension] = useState(30);
+  const [recordedAudio, setRecordedAudio] = useState<File | null>(null);
+  
+  const scenario = location.state?.scenario || 'Default conversation practice';
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -26,8 +31,19 @@ export function Simulation() {
     return () => clearInterval(interval);
   }, []);
 
+  const handleRecordingComplete = (audioFile: File) => {
+    setRecordedAudio(audioFile);
+    console.log('[Simulation] Audio recording completed:', audioFile.name);
+  };
+
   const handleEndSimulation = () => {
-    navigate('/debrief');
+    // Pass the recorded audio and scenario to the debrief page
+    navigate('/debrief', { 
+      state: { 
+        audioFile: recordedAudio, 
+        scenario: scenario 
+      } 
+    });
   };
 
   const stateColors = {
@@ -54,36 +70,8 @@ export function Simulation() {
             <h2 className="mb-1">Maya Chen</h2>
             <p className="text-muted-foreground mb-8">Technical Cofounder</p>
 
-            <div className="relative w-64 h-64 mx-auto mb-8">
-              <motion.div
-                animate={{
-                  scale: state === 'speaking' ? [1, 1.1, 1] : 1,
-                  opacity: state === 'listening' ? 0.8 : 1,
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: state === 'speaking' ? Infinity : 0,
-                }}
-                className="absolute inset-0 rounded-full"
-                style={{
-                  background: `radial-gradient(circle, ${stateColors[state]}40 0%, ${stateColors[state]}10 70%, transparent 100%)`,
-                }}
-              />
-              <motion.div
-                animate={{
-                  scale: state === 'thinking' ? [1, 1.05, 1] : 1,
-                }}
-                transition={{
-                  duration: 1.5,
-                  repeat: state === 'thinking' ? Infinity : 0,
-                }}
-                className="absolute inset-8 rounded-full flex items-center justify-center"
-                style={{
-                  backgroundColor: stateColors[state],
-                }}
-              >
-                <span className="text-white">{stateLabels[state]}</span>
-              </motion.div>
+            <div className="mb-8">
+              <VoiceOrb onRecordingComplete={handleRecordingComplete} />
             </div>
 
             <p className="text-muted-foreground mb-12">

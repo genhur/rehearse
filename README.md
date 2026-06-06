@@ -47,11 +47,11 @@ Users can then run the conversation again and immediately apply the feedback.
 
 ### Professional
 
-- Delivering difficult news to a cofounder
 - Asking for a raise or promotion
+- Delivering difficult news to a cofounder
 - Giving constructive feedback
 - Handling conflict with a teammate
-- Navigating a performance conversation
+- Navigating a performance conversation or interview
 
 ### Personal
 

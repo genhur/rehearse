@@ -922,7 +922,7 @@ export function Conversation() {
         title={getSessionTitle()}
         subtitle={getSessionSubtitle()}
         status={getSessionStatus()}
-        showHomeButton={true}
+        showHomeButton={false}
         showHistoryButton={true}
         onHistoryClick={openHistoryPanel}
       />

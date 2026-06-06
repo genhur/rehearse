@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Clock, User, Briefcase, Heart, Circle } from 'lucide-react';
+import { X, Clock, User, Briefcase, Heart, Circle, Plus } from 'lucide-react';
 import { Button } from './Button';
-import { getSessions, type RehearsalSession } from '../../../lib/sessions';
+import { getSessions, hasActiveSession, type RehearsalSession } from '../../../lib/sessions';
 import { useNavigate } from 'react-router';
 
 interface SessionHistoryPanelProps {
@@ -12,13 +12,21 @@ interface SessionHistoryPanelProps {
 
 export function SessionHistoryPanel({ isOpen, onClose }: SessionHistoryPanelProps) {
   const [sessions, setSessions] = useState<RehearsalSession[]>([]);
+  const [hasActive, setHasActive] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     if (isOpen) {
-      setSessions(getSessions());
+      const sessionList = getSessions();
+      setSessions(sessionList);
+      setHasActive(hasActiveSession(sessionList));
     }
   }, [isOpen]);
+
+  const handleNewRehearsal = () => {
+    onClose();
+    navigate('/');
+  };
 
   const getCategoryIcon = (category: RehearsalSession['category']) => {
     switch (category) {
@@ -102,6 +110,24 @@ export function SessionHistoryPanel({ isOpen, onClose }: SessionHistoryPanelProp
               >
                 <X className="w-5 h-5" />
               </Button>
+            </div>
+
+            {/* New rehearsal button */}
+            <div className="p-4 border-b border-border">
+              <Button
+                onClick={handleNewRehearsal}
+                disabled={hasActive}
+                className="w-full"
+                variant={hasActive ? "secondary" : "primary"}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                New rehearsal
+              </Button>
+              {hasActive && (
+                <p className="text-xs text-muted-foreground mt-2 text-center">
+                  Complete your active session to start a new rehearsal
+                </p>
+              )}
             </div>
 
             {/* Sessions list */}

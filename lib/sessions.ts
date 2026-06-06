@@ -448,6 +448,14 @@ class SessionManager {
   }
 }
 
+// Helper function to check if there are any active sessions
+export function hasActiveSession(sessions: RehearsalSession[]): boolean {
+  return sessions.some(session =>
+    session.status === 'active' ||
+    session.attempts?.some(attempt => attempt.status === 'active')
+  );
+}
+
 // Helper function to get current attempt for a session
 export function getCurrentAttempt(session: RehearsalSession | null): RehearsalAttempt | null {
   if (!session) return null;

@@ -1007,24 +1007,42 @@ export function Conversation() {
       params
     });
     
-    // If this is a setup conversation with content, convert it to a session first
+    // If this is a setup conversation with content, complete it directly
     if (setupConversation && setupId && !sessionId && !session && transcript.length > 0) {
-      console.log("END_CALL: Converting setup to session then completing");
-      try {
-        const newSession = commitSetupToSession(setupId);
-        console.log("END_CALL: Session created from setup:", newSession.id);
-        
-        // Update local state with the new session
-        setSession(newSession);
-        const newAttempt = getCurrentAttempt(newSession);
-        setCurrentAttempt(newAttempt);
-        
-        // Now complete the converted session
-        forceCompleteCurrentConversation();
-        return;
-      } catch (error) {
-        console.error("END_CALL: Failed to convert setup to session:", error);
-      }
+      console.log("END_CALL: Completing setup conversation directly");
+      
+      // Create a minimal session-like object for the completion UI
+      const mockSession = {
+        id: setupId,
+        title: setupConversation.scenarioDraft || 'Setup Conversation',
+        scenario: setupConversation.scenarioDraft || 'Setup Conversation',
+        status: 'complete' as const,
+        phase: 'complete' as const,
+        characterName: setupConversation.characterName || 'Assistant',
+        characterRole: setupConversation.characterRole || 'Conversation Partner',
+        attempts: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      
+      const mockAttempt = {
+        id: `attempt_${Date.now()}`,
+        attemptNumber: 1,
+        status: 'complete' as const,
+        startedAt: transcript[0]?.timestamp || new Date().toISOString(),
+        endedAt: new Date().toISOString(),
+        transcript,
+        feedbackReport: generateFallbackFeedbackReport()
+      };
+      
+      // Update local state to show completion
+      setSession(mockSession);
+      setCurrentAttempt(mockAttempt);
+      setIsSessionActive(false);
+      setConversationState('idle');
+      
+      console.log("END_CALL: Setup conversation completed with mock session");
+      return;
     }
     
     // Handle regular sessions

@@ -48,6 +48,11 @@ export function Conversation() {
         'What conversation do you need to rehearse?'
       );
       setMessages([initialMessage]);
+      
+      // Auto-start conversation immediately
+      setTimeout(() => {
+        handleStartConversation();
+      }, 500);
     }
   }, [sessionId, navigate]);
 
@@ -173,8 +178,33 @@ export function Conversation() {
     // Update session status to completed
     sessionStorage.updateSessionStatus(sessionId, 'completed');
     
-    // Navigate to debrief
+    // Update local session state to reflect completion
+    setSession(prev => prev ? { ...prev, status: 'completed' } : null);
+  };
+
+  const handleViewDebrief = () => {
+    if (!sessionId) return;
     navigate(`/debrief/${sessionId}`);
+  };
+
+  const handlePracticeAgain = () => {
+    navigate('/');
+  };
+
+  const calculateDuration = () => {
+    if (!session || messages.length === 0) return '0s';
+    
+    const firstMessage = messages[0];
+    const lastMessage = messages[messages.length - 1];
+    const durationMs = lastMessage.timestamp - firstMessage.timestamp;
+    
+    const minutes = Math.floor(durationMs / 60000);
+    const seconds = Math.floor((durationMs % 60000) / 1000);
+    
+    if (minutes > 0) {
+      return `${minutes}m ${seconds}s`;
+    }
+    return `${seconds}s`;
   };
 
   // Mock conversation simulation - TODO: Replace with real ElevenLabs integration
@@ -298,16 +328,16 @@ export function Conversation() {
                   <PhoneOff className="w-4 h-4" />
                   End
                 </Button>
-              ) : (
-                <Button
-                  onClick={handleStartConversation}
-                  size="sm"
-                  className="flex items-center gap-2"
-                >
-                  <Phone className="w-4 h-4" />
-                  Start
-                </Button>
-              )}
+              ) : session?.status === 'completed' ? (
+                <div className="text-right">
+                  <div className="text-sm text-muted-foreground">
+                    Duration: {calculateDuration()}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Messages: {messages.length}
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -325,10 +355,7 @@ export function Conversation() {
                     <Phone className="w-8 h-8 text-muted-foreground" />
                   </div>
                   <p className="text-muted-foreground mb-2">
-                    Ready to start your conversation practice
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Click "Start" to begin speaking with {session.role}
+                    Starting your conversation practice...
                   </p>
                 </div>
               </div>
@@ -370,6 +397,44 @@ export function Conversation() {
               </div>
             )}
           </div>
+
+          {/* Completion banner */}
+          {session?.status === 'completed' && (
+            <div className="border-t border-border bg-green-50 p-6">
+              <div className="max-w-md mx-auto text-center">
+                <div className="flex items-center justify-center gap-2 mb-4">
+                  <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-sm">✓</span>
+                  </div>
+                  <h3 className="text-lg font-medium">Rehearsal Complete</h3>
+                </div>
+                
+                <div className="flex justify-center gap-6 mb-6 text-sm text-muted-foreground">
+                  <span>Duration: {calculateDuration()}</span>
+                  <span>Messages: {messages.length}</span>
+                </div>
+                
+                <div className="flex gap-3">
+                  <Button
+                    onClick={handleViewDebrief}
+                    variant="default"
+                    size="sm"
+                    className="flex-1"
+                  >
+                    View Debrief
+                  </Button>
+                  <Button
+                    onClick={handlePracticeAgain}
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                  >
+                    Practice Again
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Voice interaction area */}
           {isSessionActive && (

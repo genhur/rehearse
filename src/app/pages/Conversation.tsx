@@ -1001,15 +1001,16 @@ export function Conversation() {
       params
     });
     
-    // Only navigate home if this is truly a setup conversation (no real session exists)
-    if (setupConversation && !sessionId && !session) {
-      console.log("END_CALL: Pure setup conversation, navigating home");
+    // Always try to complete conversation first
+    // Only navigate home if completion fails and we have no valid session
+    console.log("END_CALL: Attempting to complete conversation");
+    
+    if (!sessionId && !session) {
+      console.log("END_CALL: No session to complete, navigating home");
       navigate('/');
       return;
     }
     
-    // Handle regular sessions or setup that has been converted to session
-    console.log("END_CALL: Completing conversation");
     forceCompleteCurrentConversation();
   };
 

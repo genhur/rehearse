@@ -82,6 +82,7 @@ Rehearse was built using:
 * ElevenLabs Conversational AI for real-time voice conversations
 * React and TypeScript for the web application
 * Vite for frontend tooling
+* Valence for emotional detection
 * Local session persistence for conversation history and reports
 * LLM-powered conversation simulation and feedback generation
 

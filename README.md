@@ -71,9 +71,9 @@ Voice creates an opportunity to practice both content and communication style. R
 
 ## Why This Is Interesting
 
-AI has become remarkably good at generating text, but many of the situations people care most about are spoken conversations. Rehearse explores what happens when voice AI is used as a practice environment rather than an assistant. Instead of helping users write a difficult message, it helps them prepare for the actual conversation itself.
+Rehearse explores what becomes possible when advances in emotionally intelligent voice AI turn conversation itself into a medium for learning. Instead of helping users write a difficult message, it helps them prepare for the actual conversation.
 
-The long-term vision is a system that helps people build communication skills through repeated practice, much like language-learning apps help people build fluency through repetition.
+The long-term vision is a system that helps people build communication skills through repeated practice, much like language-learning apps help people build fluency through repetition. As voice AI becomes more natural, emotionally aware, and conversationally capable, it can evolve from an assistant that gives advice into a practice environment where people develop confidence, empathy, leadership, and difficult interpersonal skills before the moments that matter most.
 
 ## Tech
 

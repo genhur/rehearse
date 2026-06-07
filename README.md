@@ -39,6 +39,7 @@ Users can then run the conversation again and immediately apply the feedback.
 - Real-time voice conversations powered by ElevenLabs
 - AI-generated conversation partners
 - Live conversation transcripts
+- Debrief by emotionally intelligent voice AI covering strengths, opportunity areas, suggestions
 - Communication feedback reports
 - Session history with saved conversations
 - Conversation titles generated from session context

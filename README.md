@@ -70,6 +70,9 @@ Most communication advice focuses on what to say. In practice, how something is 
 
 Voice creates an opportunity to practice both content and communication style. Rehearse is designed to help users understand not only whether they made the right argument, but also how they may have come across to the other person.
 
+One thing that surprised me while testing Rehearse was that I started getting defensive during a simulated argument, even though I knew I was talking to an AI and we were roleplaying a fake relationship. I could hear myself justifying and retreating into familiar patterns. The debrief called it out afterward. People can mask harmful relational patterns behind scripts, therapy sessions, and professional training, but these roleplay sessions can surface real habits.  
+
+
 ## Why This Is Interesting
 
 Rehearse explores what becomes possible when advances in emotionally intelligent voice AI turn conversation itself into a medium for learning. Instead of helping users write a difficult message, it helps them prepare for the actual conversation.

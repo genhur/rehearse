@@ -1779,7 +1779,7 @@ export function Conversation() {
                       {turn.speaker === 'user' ? (
                         <UserSpeechBubble>{turn.text}</UserSpeechBubble>
                       ) : (
-                        <p className="font-body text-r-text-primary" style={{ fontSize: 14, lineHeight: 1.55 }}>
+                        <p className="font-body text-r-text-primary" style={{ fontSize: 16, lineHeight: 1.55 }}>
                           {cleanAssistantText(turn.text)}
                         </p>
                       )}
@@ -1845,7 +1845,7 @@ export function Conversation() {
                   <button
                     onClick={handleRunItAgain}
                     className="font-geist text-r-text-secondary uppercase flex items-center gap-2"
-                    style={{ fontSize: 16, fontWeight: 400, letterSpacing: '0.06em' }}
+                    style={{ fontSize: 14, fontWeight: 500, letterSpacing: '0.06em' }}
                   >
                     <Play className="w-4 h-4" />
                     Run it again

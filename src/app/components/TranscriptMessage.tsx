@@ -9,7 +9,7 @@ export function TranscriptMessage({ content, timestamp }: TranscriptMessageProps
       <div>
         <p
           className="font-body text-r-text-primary"
-          style={{ fontSize: 14, lineHeight: 1.55 }}
+          style={{ fontSize: 16, lineHeight: 1.55 }}
         >
           {content}
         </p>

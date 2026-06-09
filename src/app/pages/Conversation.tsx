@@ -1097,30 +1097,6 @@ export function Conversation() {
     // Clear inactivity timeout
     clearInactivityTimeout();
     
-    // Set local voice state to idle / inactive
-    setIsSessionActive(false);
-    setConversationState('idle');
-    setIsRecording(false);
-    
-    // Try to stop ElevenLabs session but don't block on it
-    if (conversationRef.current) {
-      try {
-        conversationRef.current.endSession();
-        conversationRef.current = null;
-      } catch (error) {
-        console.log('ElevenLabs cleanup failed, continuing anyway:', error);
-      }
-    }
-    
-    // Stop audio recording but don't block
-    if (isRecording) {
-      try {
-        audioRecordingService.stopRecording();
-      } catch (error) {
-        console.log('Audio recording cleanup failed, continuing anyway:', error);
-      }
-    }
-    
     if (!sessionId || !session) {
       console.log('No valid session to complete');
       return;
@@ -1240,6 +1216,39 @@ export function Conversation() {
       params
     });
     
+    // If session is already complete, do nothing (idempotent)
+    if (session?.status === 'complete' && session?.phase === 'complete') {
+      console.log("END_CALL: Session already complete, no action needed");
+      return;
+    }
+    
+    // Step 1: Stop ElevenLabs voice session if it exists
+    if (conversationRef.current) {
+      try {
+        conversationRef.current.endSession();
+        conversationRef.current = null;
+        console.log("END_CALL: ElevenLabs session ended");
+      } catch (error) {
+        console.log('ElevenLabs cleanup failed, continuing anyway:', error);
+      }
+    }
+    
+    // Step 2: Set voice state to idle/inactive
+    setIsSessionActive(false);
+    setConversationState('idle');
+    setIsRecording(false);
+    
+    // Stop audio recording
+    if (isRecording) {
+      try {
+        audioRecordingService.stopRecording();
+        console.log("END_CALL: Audio recording stopped");
+      } catch (error) {
+        console.log('Audio recording cleanup failed, continuing anyway:', error);
+      }
+    }
+    
+    // Step 3: Mark the conversation as complete
     // If this is a setup conversation with content, complete it directly
     if (setupConversation && setupId && !sessionId && !session && transcript.length > 0) {
       console.log("END_CALL: Completing setup conversation directly");
@@ -1249,6 +1258,7 @@ export function Conversation() {
         id: setupId,
         title: setupConversation.scenarioDraft || 'Setup Conversation',
         scenario: setupConversation.scenarioDraft || 'Setup Conversation',
+        category: 'other' as const,
         status: 'complete' as const,
         phase: 'complete' as const,
         characterName: setupConversation.characterName || 'Assistant',
@@ -1271,8 +1281,6 @@ export function Conversation() {
       // Update local state to show completion
       setSession(mockSession);
       setCurrentAttempt(mockAttempt);
-      setIsSessionActive(false);
-      setConversationState('idle');
       
       console.log("END_CALL: Setup conversation completed with mock session");
       return;
@@ -1285,10 +1293,8 @@ export function Conversation() {
       return;
     }
     
-    // No session and no convertible setup - navigate home
-    console.log("END_CALL: No session to complete, navigating home");
-    console.trace('NAVIGATE_HOME_CALLED: No session in handleEndConversation');
-    navigate('/');
+    // No session to complete - stay on conversation page
+    console.log("END_CALL: No session to complete, staying on conversation page");
   };
 
   const handleViewFeedback = () => {

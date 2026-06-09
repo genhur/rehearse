@@ -1,0 +1,15 @@
+#!/bin/bash
+set -e
+
+timeout=30
+while [ $timeout -gt 0 ]; do
+  if curl -sf "http://localhost:${PORT}" > /dev/null 2>&1; then
+    echo "Dev server is running on port ${PORT}"
+    exit 0
+  fi
+  sleep 1
+  timeout=$((timeout - 1))
+done
+
+echo "Dev server did not respond within 30 seconds"
+exit 1

@@ -13,11 +13,11 @@ interface AppHeaderProps {
   onEndCall?: () => void;
 }
 
-export function AppHeader({ 
-  title, 
-  subtitle, 
+export function AppHeader({
+  title,
+  subtitle,
   showHomeButton = true,
-  showHistoryButton = true, 
+  showHistoryButton = true,
   status,
   onHistoryClick,
   showEndCall = false,
@@ -68,7 +68,7 @@ export function AppHeader({
                 <Home className="w-4 h-4" />
               </Button>
             )}
-            
+
             {showHistoryButton && (
               <Button
                 onClick={onHistoryClick}
@@ -102,7 +102,7 @@ export function AppHeader({
                 <span>{getStatusLabel()}</span>
               </div>
             )}
-            
+
             {showEndCall && (
               <Button
                 onClick={() => {
@@ -117,6 +117,8 @@ export function AppHeader({
                 End call
               </Button>
             )}
+            {/* Debug info */}
+            {console.log("AppHeader render: showEndCall =", showEndCall, "onEndCall =", !!onEndCall)}
           </div>
         </div>
       </div>

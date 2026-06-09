@@ -31,6 +31,29 @@
   --chart-4: #ef4444;
   --chart-5: #8b5cf6;
   --radius: 0.75rem;
+
+  /* Rehearse Design System — Colors */
+  --r-bg: #181818;
+  --r-surface: #222222;
+  --r-text-primary: #f3f3f3;
+  --r-text-secondary: rgba(243, 243, 243, 0.5);
+  --r-accent-purple: #833EF2;
+  --r-accent-blue: #3E5BF2;
+  --r-accent-green: #234A3B;
+  --r-accent-mint: #98E1D3;
+  --r-accent-pink: #EB8EF2;
+  --r-accent-yellow: #DDCF50;
+  --r-accent-white: #F9F4F6;
+  --r-accent-navy: #132DB3;
+  --r-cta-bg: #FFFFFF;
+  --r-cta-text: #25281A;
+
+  /* Rehearse Design System — Border Radius */
+  --r-radius-sm: 4px;
+  --r-radius-md: 8px;
+  --r-radius-lg: 16px;
+  --r-radius-pill: 9999px;
+
   --sidebar: #ffffff;
   --sidebar-foreground: #1a1a1a;
   --sidebar-primary: #1a1a1a;
@@ -109,6 +132,26 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  /* Rehearse Design System — Colors */
+  --color-r-bg: var(--r-bg);
+  --color-r-surface: var(--r-surface);
+  --color-r-text-primary: var(--r-text-primary);
+  --color-r-text-secondary: var(--r-text-secondary);
+  --color-r-accent-purple: var(--r-accent-purple);
+  --color-r-accent-blue: var(--r-accent-blue);
+  --color-r-accent-green: var(--r-accent-green);
+  --color-r-accent-mint: var(--r-accent-mint);
+  --color-r-accent-pink: var(--r-accent-pink);
+  --color-r-accent-yellow: var(--r-accent-yellow);
+  --color-r-accent-white: var(--r-accent-white);
+  --color-r-accent-navy: var(--r-accent-navy);
+  --color-r-cta-bg: var(--r-cta-bg);
+  --color-r-cta-text: var(--r-cta-text);
+
+  /* Rehearse Design System — Typography */
+  --font-display: 'Newsreader', serif;
+  --font-geist: 'Geist Mono', monospace;
+
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);

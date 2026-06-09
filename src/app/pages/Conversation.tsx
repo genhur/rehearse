@@ -1,15 +1,20 @@
 import { useState, useEffect, useRef } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, useParams, useOutletContext } from 'react-router';
 import { Button } from '../components/Button';
-import { AppHeader } from '../components/AppHeader';
 import { FeedbackRail } from '../components/FeedbackRail';
-import { getSession, updateSession, sessionManager, getCurrentAttempt, getSetupConversation, updateSetupConversation, commitSetupToSession, endCurrentAttempt as endSessionAttempt, type RehearsalSession, type RehearsalAttempt, type SetupConversation, type TranscriptTurn, type AudioAnalysis, type FeedbackReport, type RehearsalPhase } from '../../../lib/sessions';
-import { SimpleVoiceOrb } from '../components/SimpleVoiceOrb';
+import { getSession, sessionManager, getCurrentAttempt, getSetupConversation, updateSetupConversation, commitSetupToSession, endCurrentAttempt as endSessionAttempt, type RehearsalSession, type RehearsalAttempt, type SetupConversation, type TranscriptTurn, type AudioAnalysis, type FeedbackReport, type RehearsalPhase } from '../../../lib/sessions';
 import { Conversation as ElevenLabsConversation } from '@11labs/client';
 import type { Mode, Status } from '@11labs/client';
-import { Phone, PhoneOff, Play, Mic, MessageSquare } from 'lucide-react';
+import { Phone, Play, Mic } from 'lucide-react';
 import { audioRecordingService, audioAnalysisService } from '../../../lib/audio-analysis';
+import { UserSpeechBubble } from '../components/UserSpeechBubble';
+import { UserActivityIndicator } from '../components/UserActivityIndicator';
+import { SystemActivityIndicator } from '../components/SystemActivityIndicator';
+import { StatusLabel } from '../components/StatusLabel';
+import { ViewFeedbackButton } from '../components/ViewFeedbackButton';
+import { EndCallButton } from '../components/EndCallButton';
+import { NavigationIcon } from '../components/NavigationIcon';
 
 const AGENT_ID = 'agent_4901ktej496kfp1a1kwj03q037ey';
 
@@ -1629,12 +1634,12 @@ export function Conversation() {
 
   if (!session && !setupConversation) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-r-bg flex items-center justify-center">
         <div className="text-center">
-          <p className="text-muted-foreground mb-4">Session not found</p>
-          <Button onClick={() => { 
-            console.trace('NAVIGATE_HOME_CALLED: Back home button'); 
-            navigate('/'); 
+          <p className="text-r-text-secondary mb-4 font-geist" style={{ fontSize: 14 }}>Session not found</p>
+          <Button onClick={() => {
+            console.trace('NAVIGATE_HOME_CALLED: Back home button');
+            navigate('/');
           }}>Back home</Button>
         </div>
       </div>
@@ -1708,140 +1713,143 @@ export function Conversation() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col" style={{ '--header-height': '137px' } as React.CSSProperties}>
-      {/* App Header */}
-      <AppHeader
-        title={getSessionTitle()}
-        subtitle={getSessionSubtitle()}
-        status={getSessionStatus()}
-        showHomeButton={false}
-        showHistoryButton={true}
-        onHistoryClick={openHistoryPanel}
-        showEndCall={shouldShowEndCall}
-        onEndCall={handleEndConversation}
-      />
-
-      {/* Session Controls Bar */}
-      {(isSessionActive || currentAttempt?.status === 'complete') && (
-        <div className="border-b border-border bg-muted/20 px-6 py-3">
-          <div className="flex items-center justify-between max-w-full mx-auto">
-            <div className="flex items-center gap-4">
-              {/* Voice state indicator */}
-              {isSessionActive && (
-                <div className="flex items-center gap-2">
-                  <div 
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: conversationState === 'idle' ? '#6b7280' : conversationState === 'listening' ? '#10b981' : conversationState === 'thinking' ? '#f59e0b' : '#3b82f6' }}
-                  />
-                  <span className="text-sm text-muted-foreground">
-                    {conversationState === 'idle' ? 'Ready to start' : conversationState === 'listening' ? 'Listening...' : conversationState === 'thinking' ? 'Thinking...' : 'Speaking...'}
-                  </span>
-                </div>
-              )}
-            </div>
-            
-            <div className="flex items-center gap-3">
-              {currentAttempt?.status === 'complete' && (
-                <div className="text-right">
-                  <div className="text-xs text-muted-foreground">
-                    Duration: {calculateDuration()} · {transcript.length} messages
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+    <div
+      className="min-h-screen bg-r-bg text-r-text-primary flex flex-col"
+      style={{
+        '--background': 'var(--r-bg)',
+        '--foreground': 'var(--r-text-primary)',
+        '--card': 'var(--r-surface)',
+        '--card-foreground': 'var(--r-text-primary)',
+        '--muted': '#333333',
+        '--muted-foreground': 'var(--r-text-secondary)',
+        '--border': 'rgba(255, 255, 255, 0.1)',
+        '--header-height': '60px',
+      } as React.CSSProperties}
+    >
+      {/* Minimal dark header */}
+      <div className="flex items-center sticky top-0 z-20 bg-r-bg" style={{ padding: '20px 24px' }}>
+        <NavigationIcon onClick={openHistoryPanel} />
+        <div className="flex-1 px-4 min-w-0">
+          <h1 className="font-geist text-r-text-primary truncate" style={{ fontSize: 14, fontWeight: 500 }}>
+            {getSessionTitle()}
+          </h1>
         </div>
-      )}
+      </div>
 
-      {/* Main content with flex layout */}
+      {/* Main content */}
       <div className="flex-1 flex">
         {/* Conversation area */}
         <div className={`flex-1 flex flex-col transition-all duration-300 ${
           isFeedbackOpen ? 'mr-0' : ''
         }`}>
+          {/* Transcript */}
           <div className="flex-1 overflow-y-auto px-6 py-8">
             {transcript.length === 0 ? (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center">
-                  <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Phone className="w-8 h-8 text-muted-foreground" />
+                  <div
+                    className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+                    style={{ backgroundColor: 'var(--r-surface)' }}
+                  >
+                    <Phone className="w-8 h-8 text-r-text-secondary" />
                   </div>
-                  <p className="text-muted-foreground mb-2">
+                  <p className="text-r-text-secondary font-geist mb-2" style={{ fontSize: 14 }}>
                     Starting your conversation practice...
                   </p>
                 </div>
               </div>
             ) : (
-              <div className={`max-w-4xl mx-auto transition-all duration-300 ${
-                isFeedbackOpen ? 'max-w-3xl' : 'max-w-4xl'
+              <div className={`max-w-2xl mx-auto transition-all duration-300 ${
+                isFeedbackOpen ? 'max-w-xl' : 'max-w-2xl'
               }`}>
-                {/* Transcript format */}
-                <div className="space-y-1">
+                <div className="space-y-4">
                   {transcript.map((turn) => (
                     <motion.div
                       key={turn.id}
                       id={`turn-${turn.id}`}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className={`p-3 rounded-lg transition-all duration-300 ${
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3 }}
+                      className={`transition-all duration-300 ${
                         highlightedTurnId === turn.id
-                          ? 'bg-amber-100/80 border border-amber-200'
-                          : 'hover:bg-gray-50/50'
+                          ? 'ring-1 ring-r-accent-purple/40 rounded-xl p-2'
+                          : ''
                       }`}
                     >
-                      <div className="flex gap-4">
-                        <div className="font-medium text-sm text-gray-700 w-16 flex-shrink-0">
-                          {turn.speaker === 'user' ? 'You' : turn.speakerName}
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm leading-relaxed text-gray-900">
-                            {turn.speaker === 'agent' ? cleanAssistantText(turn.text) : turn.text}
-                          </p>
-                        </div>
-                      </div>
+                      {turn.speaker === 'user' ? (
+                        <UserSpeechBubble>{turn.text}</UserSpeechBubble>
+                      ) : (
+                        <p className="font-body text-r-text-primary" style={{ fontSize: 14, lineHeight: 1.55 }}>
+                          {cleanAssistantText(turn.text)}
+                        </p>
+                      )}
                     </motion.div>
                   ))}
+
+                  {/* Voice activity indicators */}
+                  <AnimatePresence>
+                    {isSessionActive && conversationState === 'speaking' && (
+                      <motion.div
+                        key="system-indicator"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="flex justify-start py-2"
+                      >
+                        <SystemActivityIndicator />
+                      </motion.div>
+                    )}
+                    {isSessionActive && conversationState === 'listening' && (
+                      <motion.div
+                        key="user-indicator"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="flex justify-end py-2"
+                      >
+                        <UserActivityIndicator />
+                      </motion.div>
+                    )}
+                    {isSessionActive && conversationState === 'thinking' && (
+                      <motion.div
+                        key="thinking-indicator"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="flex justify-start py-2"
+                      >
+                        <SystemActivityIndicator />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
                   <div ref={messagesEndRef} />
                 </div>
               </div>
             )}
           </div>
 
-
-          {/* Conversation completion bar */}
+          {/* Call ended state */}
           {currentAttempt?.status === 'complete' && !isGeneratingFeedback && (
-            <div className="border-t border-border bg-card/50 p-4">
+            <div className="px-6 pb-8">
               <div className={`mx-auto transition-all duration-300 ${
-                isFeedbackOpen ? 'max-w-3xl' : 'max-w-4xl'
+                isFeedbackOpen ? 'max-w-xl' : 'max-w-2xl'
               }`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-                      <span className="text-white text-sm">✓</span>
+                <div className="flex flex-col items-center gap-6 py-8">
+                  <StatusLabel>Call ended.</StatusLabel>
+                  {currentAttempt.feedbackReport && (
+                    <div className="w-full" style={{ maxWidth: 360 }}>
+                      <ViewFeedbackButton onClick={handleViewFeedback} />
                     </div>
-                    <span className="font-medium text-sm">Simulation complete</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {currentAttempt.feedbackReport && (
-                      <Button
-                        onClick={handleViewFeedback}
-                        variant="primary"
-                        size="sm"
-                        className="bg-purple-600 hover:bg-purple-700"
-                      >
-                        <MessageSquare className="w-4 h-4 mr-2" />
-                        View Feedback
-                      </Button>
-                    )}
-                    <Button
-                      onClick={handleRunItAgain}
-                      variant="outline"
-                      size="sm"
-                    >
-                      <Play className="w-4 h-4 mr-2" />
-                      Run it again
-                    </Button>
-                  </div>
+                  )}
+                  <button
+                    onClick={handleRunItAgain}
+                    className="font-geist text-r-text-secondary uppercase flex items-center gap-2"
+                    style={{ fontSize: 14, letterSpacing: '0.04em' }}
+                  >
+                    <Play className="w-4 h-4" />
+                    Run it again
+                  </button>
                 </div>
               </div>
             </div>
@@ -1849,44 +1857,42 @@ export function Conversation() {
 
           {/* Generating feedback state */}
           {isGeneratingFeedback && (
-            <div className="border-t border-border bg-card/50 p-4">
-              <div className={`mx-auto transition-all duration-300 ${
-                isFeedbackOpen ? 'max-w-3xl' : 'max-w-4xl'
-              }`}>
-                <div className="flex items-center justify-center gap-2">
-                  <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                    <Mic className="w-3 h-3 text-white animate-pulse" />
-                  </div>
-                  <span className="text-sm font-medium">Analyzing your delivery...</span>
-                </div>
+            <div className="px-6 pb-8">
+              <div className="flex items-center justify-center gap-3 py-8">
+                <Mic className="w-4 h-4 text-r-accent-purple animate-pulse" />
+                <span className="font-geist text-r-text-secondary" style={{ fontSize: 14 }}>
+                  Analyzing your delivery...
+                </span>
               </div>
             </div>
           )}
 
-          {/* Voice interaction area */}
-          {(isSessionActive || Boolean(setupConversation)) && (
-            <div className="border-t border-border bg-card/50 backdrop-blur-sm p-6">
-              <div className={`max-w-4xl mx-auto transition-all duration-300 ${
-                isFeedbackOpen ? 'max-w-3xl' : 'max-w-4xl'
+          {/* Voice interaction area (active call) */}
+          {(isSessionActive || (Boolean(setupConversation) && currentAttempt?.status !== 'complete')) && (
+            <div className="px-6 pb-6">
+              <div className={`max-w-2xl mx-auto transition-all duration-300 ${
+                isFeedbackOpen ? 'max-w-xl' : 'max-w-2xl'
               }`}>
-                <div className="flex items-center justify-center">
-                  <div className="text-center">
-                    <SimpleVoiceOrb 
-                      state={conversationState} 
-                      onClick={handleStartConversation}
-                      clickable={setupConversation ? !isSessionActive : false}
-                    />
-                    <p className="text-sm text-muted-foreground mt-4">
-                      {conversationState === 'listening' && 'Speak naturally'}
-                      {conversationState === 'thinking' && 'Processing your response...'}
-                      {conversationState === 'speaking' && 'AI is responding...'}
-                      {setupConversation && conversationState === 'idle' && 'Tap to start voice conversation'}
-                    </p>
-                  </div>
+                {/* End call button — bottom right */}
+                <div className="flex justify-end mb-4">
+                  <EndCallButton onClick={handleEndConversation} />
                 </div>
-                
+
+                {/* Setup conversation start prompt */}
+                {setupConversation && conversationState === 'idle' && !isSessionActive && (
+                  <div className="text-center">
+                    <button
+                      onClick={handleStartConversation}
+                      className="font-geist text-r-text-secondary"
+                      style={{ fontSize: 14 }}
+                    >
+                      Tap to start voice conversation
+                    </button>
+                  </div>
+                )}
+
                 {/* Mock input for testing */}
-                <div className="mt-6 flex gap-2 justify-center flex-wrap">
+                <div className="mt-4 flex gap-2 justify-center flex-wrap">
                   <Button
                     size="sm"
                     variant="outline"
@@ -1901,7 +1907,6 @@ export function Conversation() {
                   >
                     Mock: Transparent
                   </Button>
-                  {/* Dev-only test for annotations */}
                   {import.meta.env.DEV && (
                     <>
                       <Button
@@ -1910,7 +1915,7 @@ export function Conversation() {
                         onClick={generateAnnotations}
                         className="bg-purple-600 hover:bg-purple-700 text-white"
                       >
-                        🧪 Test Annotations
+                        Test Annotations
                       </Button>
                       <Button
                         size="sm"
@@ -1918,18 +1923,18 @@ export function Conversation() {
                         onClick={() => generateFeedbackReport(null)}
                         className="bg-green-600 hover:bg-green-700 text-white"
                       >
-                        🧪 Test Feedback
+                        Test Feedback
                       </Button>
                       <Button
                         size="sm"
                         variant="secondary"
                         onClick={() => {
                           setIsFeedbackOpen(!isFeedbackOpen);
-                          console.log('🧪 TOGGLING_FEEDBACK_RAIL', { isOpen: !isFeedbackOpen });
+                          console.log('TOGGLING_FEEDBACK_RAIL', { isOpen: !isFeedbackOpen });
                         }}
                         className="bg-indigo-600 hover:bg-indigo-700 text-white"
                       >
-                        🧪 Toggle Rail
+                        Toggle Rail
                       </Button>
                       <Button
                         size="sm"
@@ -1937,7 +1942,7 @@ export function Conversation() {
                         onClick={() => checkForUserDecline("No, I'm good")}
                         className="bg-red-600 hover:bg-red-700 text-white"
                       >
-                        🧪 Test Decline
+                        Test Decline
                       </Button>
                     </>
                   )}

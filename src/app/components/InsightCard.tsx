@@ -18,13 +18,13 @@ export function InsightCard({
       }}
     >
       <h3
-        className="font-geist font-medium text-r-text-primary mb-2"
+        className="font-body font-medium text-r-text-primary mb-2"
         style={{ fontSize: 14 }}
       >
         {title}
       </h3>
       <p
-        className="font-geist text-r-text-secondary"
+        className="font-body text-r-text-secondary"
         style={{ fontSize: 14, lineHeight: 1.6 }}
       >
         {description}

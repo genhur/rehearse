@@ -49,25 +49,26 @@ export function FeedbackRail({
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: '100%', opacity: 0 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="w-full bg-background border-l border-border flex flex-col sticky"
-          style={{ 
+          className="w-full bg-r-bg flex flex-col sticky"
+          style={{
+            borderLeft: '1px solid rgba(255,255,255,0.1)',
             height: 'calc(100vh - var(--header-height, 89px))',
             top: 'var(--header-height, 89px)'
           }}
         >
           {/* Fixed Header */}
-          <div className="flex items-center justify-between p-6 border-b border-border bg-card/30 flex-shrink-0">
+          <div className="flex items-center justify-between p-6 flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center">
+              <div className="w-8 h-8 bg-r-accent-purple rounded-full flex items-center justify-center">
                 <Mic className="w-4 h-4 text-white" />
               </div>
-              <h2 className="text-lg font-semibold">Feedback</h2>
+              <h2 className="font-display text-r-text-primary" style={{ fontSize: 20, fontWeight: 600 }}>Feedback</h2>
             </div>
             <Button
               onClick={onClose}
               variant="ghost"
               size="sm"
-              className="p-1 h-auto"
+              className="p-1 h-auto text-r-text-secondary"
             >
               <X className="w-5 h-5" />
             </Button>
@@ -81,29 +82,29 @@ export function FeedbackRail({
           >
             <div className="p-6 space-y-8">
               {/* Overall Assessment */}
-              <div>
-                <h3 className="text-base font-semibold mb-3 text-gray-900">Overall Assessment</h3>
-                <p className="text-gray-700 leading-relaxed text-sm">
+              <div style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 24 }}>
+                <h3 className="font-display text-r-text-primary mb-3" style={{ fontSize: 18, fontWeight: 600 }}>Overall Assessment</h3>
+                <p className="font-body text-r-text-secondary" style={{ fontSize: 14, lineHeight: 1.6 }}>
                   {report.overallAssessment}
                 </p>
               </div>
 
-              {/* How You Came Across - Highlighted Section */}
-              <div className="bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200 rounded-xl p-6">
+              {/* How You Came Across */}
+              <div className="bg-r-surface p-5" style={{ borderRadius: 'var(--r-radius-lg)', borderLeft: '3px solid var(--r-accent-purple)' }}>
                 <div className="flex items-center gap-2 mb-3">
-                  <div className="w-5 h-5 bg-purple-600 rounded-full flex items-center justify-center">
+                  <div className="w-5 h-5 bg-r-accent-purple rounded-full flex items-center justify-center">
                     <Mic className="w-2.5 h-2.5 text-white" />
                   </div>
-                  <h3 className="text-base font-semibold text-purple-900">How You Came Across</h3>
+                  <h3 className="font-display text-r-text-primary" style={{ fontSize: 16, fontWeight: 600 }}>How You Came Across</h3>
                 </div>
-                <p className="text-purple-800 font-medium leading-relaxed">
+                <p className="font-body text-r-text-primary" style={{ fontSize: 14, lineHeight: 1.6 }}>
                   {report.howYouCameAcross}
                 </p>
                 {audioAnalysis && (
-                  <div className="mt-3 px-3 py-2 bg-white/60 rounded-lg border border-purple-200">
-                    <p className="text-xs text-purple-700">
-                      Primary emotion: <span className="font-medium">{audioAnalysis.primaryEmotion}</span> 
-                      <span className="text-purple-600 ml-1">
+                  <div className="mt-3 px-3 py-2 rounded-lg" style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}>
+                    <p className="font-body text-r-text-secondary" style={{ fontSize: 12 }}>
+                      Primary emotion: <span className="text-r-text-primary font-medium">{audioAnalysis.primaryEmotion}</span>
+                      <span className="ml-1">
                         ({Math.round(audioAnalysis.confidence * 100)}% confidence)
                       </span>
                     </p>
@@ -112,30 +113,30 @@ export function FeedbackRail({
               </div>
 
               {/* What Worked */}
-              <div>
-                <h3 className="text-base font-semibold mb-3 text-green-700">What Worked</h3>
+              <div style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 24 }}>
+                <h3 className="font-display text-r-accent-mint mb-3" style={{ fontSize: 18, fontWeight: 600 }}>What Worked</h3>
                 <ul className="space-y-2">
                   {report.whatWorked.map((item, i) => (
                     <li key={i} className="flex items-start gap-3">
-                      <div className="w-4 h-4 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <span className="text-green-600 text-xs">✓</span>
+                      <div className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: 'var(--r-accent-green)' }}>
+                        <span className="text-r-accent-mint text-xs">✓</span>
                       </div>
-                      <p className="text-gray-700 text-sm leading-relaxed">{item}</p>
+                      <p className="font-body text-r-text-secondary" style={{ fontSize: 14, lineHeight: 1.6 }}>{item}</p>
                     </li>
                   ))}
                 </ul>
               </div>
 
               {/* Opportunities */}
-              <div>
-                <h3 className="text-base font-semibold mb-3 text-orange-700">Opportunities</h3>
+              <div style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 24 }}>
+                <h3 className="font-display text-r-accent-yellow mb-3" style={{ fontSize: 18, fontWeight: 600 }}>Opportunities</h3>
                 <ul className="space-y-2">
                   {report.opportunities.map((item, i) => (
                     <li key={i} className="flex items-start gap-3">
-                      <div className="w-4 h-4 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <span className="text-orange-600 text-xs">↗</span>
+                      <div className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: 'rgba(221,207,80,0.2)' }}>
+                        <span className="text-r-accent-yellow text-xs">↗</span>
                       </div>
-                      <p className="text-gray-700 text-sm leading-relaxed">{item}</p>
+                      <p className="font-body text-r-text-secondary" style={{ fontSize: 14, lineHeight: 1.6 }}>{item}</p>
                     </li>
                   ))}
                 </ul>
@@ -143,40 +144,40 @@ export function FeedbackRail({
 
               {/* Replay Moment */}
               <div>
-                <h3 className="text-base font-semibold mb-4 text-gray-900">Replay Moment</h3>
+                <h3 className="font-display text-r-text-primary mb-4" style={{ fontSize: 18, fontWeight: 600 }}>Replay Moment</h3>
                 <div className="space-y-4">
                   <div>
-                    <p className="text-xs font-medium text-gray-500 mb-2">What you said</p>
-                    <p className="p-3 bg-gray-50 rounded-lg text-sm leading-relaxed">
+                    <p className="font-body text-r-text-secondary mb-2" style={{ fontSize: 12, fontWeight: 500 }}>What you said</p>
+                    <p className="p-3 bg-r-surface rounded-lg font-body text-r-text-primary" style={{ fontSize: 14, lineHeight: 1.6 }}>
                       "{report.replayMoment.originalMoment}"
                     </p>
                   </div>
 
                   <div>
-                    <p className="text-xs font-medium text-gray-500 mb-2">How you likely sounded</p>
-                    <p className="p-3 bg-orange-50 border border-orange-200 rounded-lg text-sm leading-relaxed text-orange-800">
+                    <p className="font-body text-r-text-secondary mb-2" style={{ fontSize: 12, fontWeight: 500 }}>How you likely sounded</p>
+                    <p className="p-3 rounded-lg font-body" style={{ fontSize: 14, lineHeight: 1.6, backgroundColor: 'rgba(221,207,80,0.1)', border: '1px solid rgba(221,207,80,0.2)', color: 'var(--r-accent-yellow)' }}>
                       {report.replayMoment.howYouLikelySounded}
                     </p>
                   </div>
 
                   <div>
-                    <p className="text-xs font-medium text-gray-500 mb-2">How it may have landed</p>
-                    <p className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm leading-relaxed text-gray-700">
+                    <p className="font-body text-r-text-secondary mb-2" style={{ fontSize: 12, fontWeight: 500 }}>How it may have landed</p>
+                    <p className="p-3 bg-r-surface rounded-lg font-body text-r-text-secondary" style={{ fontSize: 14, lineHeight: 1.6 }}>
                       {report.replayMoment.howItMayHaveLanded}
                     </p>
                   </div>
 
                   <div>
-                    <p className="text-xs font-medium text-gray-500 mb-2">Stronger version</p>
-                    <p className="p-3 bg-green-50 border-2 border-green-200 rounded-lg text-sm leading-relaxed text-green-800 font-medium">
+                    <p className="font-body text-r-text-secondary mb-2" style={{ fontSize: 12, fontWeight: 500 }}>Stronger version</p>
+                    <p className="p-3 rounded-lg font-body text-r-accent-mint font-medium" style={{ fontSize: 14, lineHeight: 1.6, backgroundColor: 'rgba(152,225,211,0.1)', border: '2px solid rgba(152,225,211,0.2)' }}>
                       "{report.replayMoment.strongerVersion}"
                     </p>
                   </div>
 
                   <div>
-                    <p className="text-xs font-medium text-gray-500 mb-2">Delivery tip</p>
-                    <p className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm leading-relaxed text-blue-800">
-                      💡 {report.replayMoment.deliveryTip}
+                    <p className="font-body text-r-text-secondary mb-2" style={{ fontSize: 12, fontWeight: 500 }}>Delivery tip</p>
+                    <p className="p-3 rounded-lg font-body" style={{ fontSize: 14, lineHeight: 1.6, backgroundColor: 'rgba(62,91,242,0.1)', border: '1px solid rgba(62,91,242,0.2)', color: 'var(--r-accent-blue)' }}>
+                      {report.replayMoment.deliveryTip}
                     </p>
                   </div>
 
@@ -199,14 +200,21 @@ export function FeedbackRail({
 
           {/* Fixed Footer with Run it again */}
           {onRunAgain && (
-            <div className="border-t border-border p-6 bg-card/30 flex-shrink-0">
-              <Button 
-                onClick={onRunAgain} 
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+            <div className="p-6 flex-shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+              <button
+                onClick={onRunAgain}
+                className="w-full font-geist font-medium text-r-text-primary flex items-center justify-center gap-2 uppercase"
+                style={{
+                  padding: '16px',
+                  fontSize: 14,
+                  letterSpacing: '0.04em',
+                  borderRadius: 40,
+                  border: '1px solid rgba(255,255,255,0.15)',
+                }}
               >
-                <Play className="w-4 h-4 mr-2" />
+                <Play className="w-4 h-4" />
                 Run it again
-              </Button>
+              </button>
             </div>
           )}
         </motion.div>

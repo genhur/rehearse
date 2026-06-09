@@ -14,7 +14,7 @@ export function DebriefSection({ title, children }: DebriefSectionProps) {
       >
         {title}
       </h2>
-      <div className="font-geist text-r-text-secondary" style={{ fontSize: 14, lineHeight: 1.6 }}>
+      <div className="font-body text-r-text-secondary" style={{ fontSize: 14, lineHeight: 1.6 }}>
         {children}
       </div>
     </section>

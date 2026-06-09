@@ -47,6 +47,7 @@
   --r-accent-navy: #132DB3;
   --r-cta-bg: #FFFFFF;
   --r-cta-text: #25281A;
+  --r-user-bubble: #262626;
 
   /* Rehearse Design System — Border Radius */
   --r-radius-sm: 4px;
@@ -147,9 +148,11 @@
   --color-r-accent-navy: var(--r-accent-navy);
   --color-r-cta-bg: var(--r-cta-bg);
   --color-r-cta-text: var(--r-cta-text);
+  --color-r-user-bubble: var(--r-user-bubble);
 
   /* Rehearse Design System — Typography */
   --font-display: 'Newsreader', serif;
+  --font-body: 'Geist', sans-serif;
   --font-geist: 'Geist Mono', monospace;
 
   --color-sidebar: var(--sidebar);

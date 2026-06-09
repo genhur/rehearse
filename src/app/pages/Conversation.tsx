@@ -19,6 +19,21 @@ import { NavigationIcon } from '../components/NavigationIcon';
 
 const AGENT_ID = 'agent_4901ktej496kfp1a1kwj03q037ey';
 
+function useDevTools() {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+        e.preventDefault();
+        setVisible(v => !v);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+  return visible;
+}
+
 type ConversationState = 'idle' | 'listening' | 'thinking' | 'speaking';
 
 interface OutletContext {
@@ -38,6 +53,7 @@ export function Conversation() {
   const [currentAttempt, setCurrentAttempt] = useState<RehearsalAttempt | null>(null);
   const [transcript, setTranscript] = useState<TranscriptTurn[]>([]);
   const [conversationState, setConversationState] = useState<ConversationState>('idle');
+  const showDevTools = useDevTools();
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [elevenLabsMode, setElevenLabsMode] = useState<Mode>('listening');
   const [highlightedTurnId, setHighlightedTurnId] = useState<string | null>(null);
@@ -1892,62 +1908,59 @@ export function Conversation() {
                   </div>
                 )}
 
-                {/* Mock input for testing */}
-                <div className="mt-4 flex gap-2 justify-center flex-wrap">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleMockUserInput("I'm really worried about how they'll react to this news.")}
-                  >
-                    Mock: Worried
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleMockUserInput("I think we need to be more transparent about our financial situation.")}
-                  >
-                    Mock: Transparent
-                  </Button>
-                  {import.meta.env.DEV && (
-                    <>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={generateAnnotations}
-                        className="bg-purple-600 hover:bg-purple-700 text-white"
-                      >
-                        Test Annotations
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => generateFeedbackReport(null)}
-                        className="bg-green-600 hover:bg-green-700 text-white"
-                      >
-                        Test Feedback
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => {
-                          setIsFeedbackOpen(!isFeedbackOpen);
-                          console.log('TOGGLING_FEEDBACK_RAIL', { isOpen: !isFeedbackOpen });
-                        }}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                      >
-                        Toggle Rail
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => checkForUserDecline("No, I'm good")}
-                        className="bg-red-600 hover:bg-red-700 text-white"
-                      >
-                        Test Decline
-                      </Button>
-                    </>
-                  )}
-                </div>
+                {showDevTools && (
+                  <div className="mt-4 flex gap-2 justify-center flex-wrap">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleMockUserInput("I'm really worried about how they'll react to this news.")}
+                    >
+                      Mock: Worried
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleMockUserInput("I think we need to be more transparent about our financial situation.")}
+                    >
+                      Mock: Transparent
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={generateAnnotations}
+                      className="bg-purple-600 hover:bg-purple-700 text-white"
+                    >
+                      Test Annotations
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => generateFeedbackReport(null)}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      Test Feedback
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        setIsFeedbackOpen(!isFeedbackOpen);
+                        console.log('TOGGLING_FEEDBACK_RAIL', { isOpen: !isFeedbackOpen });
+                      }}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                    >
+                      Toggle Rail
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => checkForUserDecline("No, I'm good")}
+                      className="bg-red-600 hover:bg-red-700 text-white"
+                    >
+                      Test Decline
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           )}

@@ -25,7 +25,7 @@ export function InsightCard({
       </h3>
       <p
         className="font-body text-r-text-secondary"
-        style={{ fontSize: 14, lineHeight: 1.6 }}
+        style={{ fontSize: 16, lineHeight: 1.6 }}
       >
         {description}
       </p>

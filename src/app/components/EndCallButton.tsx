@@ -1,4 +1,4 @@
-import { PhoneOff } from 'lucide-react';
+import { EndCallIcon } from './EndCallIcon';
 
 interface EndCallButtonProps {
   onClick?: () => void;
@@ -8,16 +8,16 @@ export function EndCallButton({ onClick }: EndCallButtonProps) {
   return (
     <button
       onClick={onClick}
-      className="flex items-center justify-center"
+      className="flex items-center justify-center text-r-text-primary"
       style={{
-        width: 56,
-        height: 56,
+        width: 80,
+        height: 80,
         borderRadius: 9999,
-        backgroundColor: '#ef4444',
+        backgroundColor: '#262626',
       }}
       aria-label="End call"
     >
-      <PhoneOff size={24} color="white" />
+      <EndCallIcon size={34} />
     </button>
   );
 }

@@ -7,7 +7,7 @@ export function StatusLabel({ children }: StatusLabelProps) {
     <span
       className="font-geist text-r-text-secondary uppercase block text-center"
       style={{
-        fontSize: 16,
+        fontSize: 13,
         fontWeight: 300,
         letterSpacing: '0.08em',
       }}

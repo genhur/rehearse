@@ -6,7 +6,8 @@ import { FeedbackRail } from '../components/FeedbackRail';
 import { getSession, sessionManager, getCurrentAttempt, getSetupConversation, updateSetupConversation, commitSetupToSession, endCurrentAttempt as endSessionAttempt, type RehearsalSession, type RehearsalAttempt, type SetupConversation, type TranscriptTurn, type AudioAnalysis, type FeedbackReport, type RehearsalPhase } from '../../../lib/sessions';
 import { Conversation as ElevenLabsConversation } from '@11labs/client';
 import type { Mode, Status } from '@11labs/client';
-import { Phone, Play, Mic } from 'lucide-react';
+import { Play, Mic } from 'lucide-react';
+import { StartCallIcon } from '../components/StartCallIcon';
 import { audioRecordingService, audioAnalysisService } from '../../../lib/audio-analysis';
 import { UserSpeechBubble } from '../components/UserSpeechBubble';
 import { UserActivityIndicator } from '../components/UserActivityIndicator';
@@ -1730,7 +1731,7 @@ export function Conversation() {
       <div className="flex items-center sticky top-0 z-20 bg-r-bg" style={{ padding: '20px 24px' }}>
         <NavigationIcon onClick={openHistoryPanel} />
         <div className="flex-1 px-4 min-w-0">
-          <h1 className="font-geist text-r-text-primary truncate" style={{ fontSize: 14, fontWeight: 500 }}>
+          <h1 className="font-display text-r-text-primary truncate" style={{ fontSize: 22, fontWeight: 500 }}>
             {getSessionTitle()}
           </h1>
         </div>
@@ -1751,7 +1752,7 @@ export function Conversation() {
                     className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
                     style={{ backgroundColor: 'var(--r-surface)' }}
                   >
-                    <Phone className="w-8 h-8 text-r-text-secondary" />
+                    <StartCallIcon size={32} className="text-r-text-secondary" />
                   </div>
                   <p className="text-r-text-secondary font-geist mb-2" style={{ fontSize: 14 }}>
                     Starting your conversation practice...
@@ -1779,7 +1780,7 @@ export function Conversation() {
                       {turn.speaker === 'user' ? (
                         <UserSpeechBubble>{turn.text}</UserSpeechBubble>
                       ) : (
-                        <p className="font-body text-r-text-primary" style={{ fontSize: 14, lineHeight: 1.55 }}>
+                        <p className="font-body text-r-text-primary" style={{ fontSize: 16, lineHeight: 1.55 }}>
                           {cleanAssistantText(turn.text)}
                         </p>
                       )}
@@ -1845,7 +1846,7 @@ export function Conversation() {
                   <button
                     onClick={handleRunItAgain}
                     className="font-geist text-r-text-secondary uppercase flex items-center gap-2"
-                    style={{ fontSize: 14, letterSpacing: '0.04em' }}
+                    style={{ fontSize: 14, fontWeight: 500, letterSpacing: '0.06em' }}
                   >
                     <Play className="w-4 h-4" />
                     Run it again

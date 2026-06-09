@@ -12,7 +12,7 @@ export function UserSpeechBubble({ children }: UserSpeechBubbleProps) {
           padding: '12px 16px',
           borderRadius: '20px 20px 4px 20px',
           maxWidth: '80%',
-          fontSize: 14,
+          fontSize: 16,
           lineHeight: 1.55,
         }}
       >

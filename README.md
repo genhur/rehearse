@@ -98,7 +98,8 @@ Prototype:
 <img width="783" height="401" alt="Screenshot 2026-06-06 at 7 55 52 PM" src="https://github.com/user-attachments/assets/674b5fc2-4807-4ccb-82b8-e0129935f6c8" />
 
 Design concept (WIP, coming soon)
-<img width="558" height="240" alt="Screenshot 2026-06-09 at 3 37 19 AM" src="https://github.com/user-attachments/assets/949ea9bb-a42b-44ad-9789-62e3d84cb3ab" />
+<img width="757" height="277" alt="Screenshot 2026-06-09 at 8 40 35 AM" src="https://github.com/user-attachments/assets/ed340566-7561-49bc-b5c9-a3975ea88063" />
+
 
 
 

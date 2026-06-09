@@ -203,11 +203,12 @@ export function FeedbackRail({
             <div className="p-6 flex-shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
               <button
                 onClick={onRunAgain}
-                className="w-full font-geist font-medium text-r-text-primary flex items-center justify-center gap-2 uppercase"
+                className="w-full font-geist text-r-text-primary flex items-center justify-center gap-2 uppercase"
                 style={{
                   padding: '16px',
-                  fontSize: 14,
-                  letterSpacing: '0.04em',
+                  fontSize: 16,
+                  fontWeight: 400,
+                  letterSpacing: '0.06em',
                   borderRadius: 40,
                   border: '1px solid rgba(255,255,255,0.15)',
                 }}

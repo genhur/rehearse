@@ -1730,7 +1730,7 @@ export function Conversation() {
       <div className="flex items-center sticky top-0 z-20 bg-r-bg" style={{ padding: '20px 24px' }}>
         <NavigationIcon onClick={openHistoryPanel} />
         <div className="flex-1 px-4 min-w-0">
-          <h1 className="font-geist text-r-text-primary truncate" style={{ fontSize: 14, fontWeight: 500 }}>
+          <h1 className="font-display text-r-text-primary truncate" style={{ fontSize: 22, fontWeight: 500 }}>
             {getSessionTitle()}
           </h1>
         </div>
@@ -1845,7 +1845,7 @@ export function Conversation() {
                   <button
                     onClick={handleRunItAgain}
                     className="font-geist text-r-text-secondary uppercase flex items-center gap-2"
-                    style={{ fontSize: 14, letterSpacing: '0.04em' }}
+                    style={{ fontSize: 16, fontWeight: 400, letterSpacing: '0.06em' }}
                   >
                     <Play className="w-4 h-4" />
                     Run it again

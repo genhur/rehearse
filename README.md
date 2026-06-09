@@ -94,5 +94,10 @@ Rehearse was built using:
 
 Rebuild X ElevenLabs Hackathon 2026
 
+Prototype:
 <img width="783" height="401" alt="Screenshot 2026-06-06 at 7 55 52 PM" src="https://github.com/user-attachments/assets/674b5fc2-4807-4ccb-82b8-e0129935f6c8" />
+
+Design concept:
+<img width="536" height="253" alt="Screenshot 2026-06-09 at 3 22 05 AM" src="https://github.com/user-attachments/assets/00bc1a4f-5da0-4947-8547-decc85e53128" />
+
 

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Outlet } from 'react-router';
 import { SessionHistoryPanel } from './SessionHistoryPanel';
+import { InterfaceKit } from 'interface-kit/react';
 
 export function AppLayout() {
   const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState(false);
@@ -18,6 +19,9 @@ export function AppLayout() {
         openHistoryPanel: () => setIsHistoryPanelOpen(true),
         isHistoryPanelOpen 
       }} />
+      
+      {/* Interface Kit - Development Mode Only */}
+      {import.meta.env.DEV && <InterfaceKit />}
     </div>
   );
 }

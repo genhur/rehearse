@@ -1892,62 +1892,59 @@ export function Conversation() {
                   </div>
                 )}
 
-                {/* Mock input for testing */}
-                <div className="mt-4 flex gap-2 justify-center flex-wrap">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleMockUserInput("I'm really worried about how they'll react to this news.")}
-                  >
-                    Mock: Worried
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleMockUserInput("I think we need to be more transparent about our financial situation.")}
-                  >
-                    Mock: Transparent
-                  </Button>
-                  {import.meta.env.DEV && (
-                    <>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={generateAnnotations}
-                        className="bg-purple-600 hover:bg-purple-700 text-white"
-                      >
-                        Test Annotations
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => generateFeedbackReport(null)}
-                        className="bg-green-600 hover:bg-green-700 text-white"
-                      >
-                        Test Feedback
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => {
-                          setIsFeedbackOpen(!isFeedbackOpen);
-                          console.log('TOGGLING_FEEDBACK_RAIL', { isOpen: !isFeedbackOpen });
-                        }}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                      >
-                        Toggle Rail
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => checkForUserDecline("No, I'm good")}
-                        className="bg-red-600 hover:bg-red-700 text-white"
-                      >
-                        Test Decline
-                      </Button>
-                    </>
-                  )}
-                </div>
+                {import.meta.env.DEV && (
+                  <div className="mt-4 flex gap-2 justify-center flex-wrap">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleMockUserInput("I'm really worried about how they'll react to this news.")}
+                    >
+                      Mock: Worried
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleMockUserInput("I think we need to be more transparent about our financial situation.")}
+                    >
+                      Mock: Transparent
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={generateAnnotations}
+                      className="bg-purple-600 hover:bg-purple-700 text-white"
+                    >
+                      Test Annotations
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => generateFeedbackReport(null)}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      Test Feedback
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        setIsFeedbackOpen(!isFeedbackOpen);
+                        console.log('TOGGLING_FEEDBACK_RAIL', { isOpen: !isFeedbackOpen });
+                      }}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                    >
+                      Toggle Rail
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => checkForUserDecline("No, I'm good")}
+                      className="bg-red-600 hover:bg-red-700 text-white"
+                    >
+                      Test Decline
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           )}

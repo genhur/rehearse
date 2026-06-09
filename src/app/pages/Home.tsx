@@ -1,6 +1,6 @@
 import { motion } from 'motion/react';
 import { useNavigate, useOutletContext } from 'react-router';
-import { Phone } from 'lucide-react';
+import { StartCallIcon } from '../components/StartCallIcon';
 import { createSetupConversation } from '../../../lib/sessions';
 import { ScreenContainer } from '../components/ScreenContainer';
 import { NavigationIcon } from '../components/NavigationIcon';
@@ -63,7 +63,7 @@ export function Home() {
       >
         <PrimaryCTA
           onClick={handleStartSession}
-          icon={<Phone size={20} />}
+          icon={<StartCallIcon size={20} />}
         >
           Start session
         </PrimaryCTA>

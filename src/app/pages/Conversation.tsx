@@ -6,7 +6,8 @@ import { FeedbackRail } from '../components/FeedbackRail';
 import { getSession, sessionManager, getCurrentAttempt, getSetupConversation, updateSetupConversation, commitSetupToSession, endCurrentAttempt as endSessionAttempt, type RehearsalSession, type RehearsalAttempt, type SetupConversation, type TranscriptTurn, type AudioAnalysis, type FeedbackReport, type RehearsalPhase } from '../../../lib/sessions';
 import { Conversation as ElevenLabsConversation } from '@11labs/client';
 import type { Mode, Status } from '@11labs/client';
-import { Phone, Play, Mic } from 'lucide-react';
+import { Play, Mic } from 'lucide-react';
+import { StartCallIcon } from '../components/StartCallIcon';
 import { audioRecordingService, audioAnalysisService } from '../../../lib/audio-analysis';
 import { UserSpeechBubble } from '../components/UserSpeechBubble';
 import { UserActivityIndicator } from '../components/UserActivityIndicator';
@@ -1751,7 +1752,7 @@ export function Conversation() {
                     className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
                     style={{ backgroundColor: 'var(--r-surface)' }}
                   >
-                    <Phone className="w-8 h-8 text-r-text-secondary" />
+                    <StartCallIcon size={32} className="text-r-text-secondary" />
                   </div>
                   <p className="text-r-text-secondary font-geist mb-2" style={{ fontSize: 14 }}>
                     Starting your conversation practice...

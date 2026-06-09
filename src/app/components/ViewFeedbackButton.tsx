@@ -1,4 +1,4 @@
-import { Mail } from 'lucide-react';
+import { ReportIcon } from './ReportIcon';
 
 interface ViewFeedbackButtonProps {
   onClick?: () => void;
@@ -17,7 +17,7 @@ export function ViewFeedbackButton({ onClick }: ViewFeedbackButtonProps) {
         borderRadius: 40,
       }}
     >
-      <Mail size={20} />
+      <ReportIcon size={20} />
       View feedback
     </button>
   );

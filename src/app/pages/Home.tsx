@@ -36,10 +36,11 @@ export function Home() {
         initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
-        style={{ padding: '72px 24px 0', maxWidth: 378 }}
+        style={{ padding: '72px 24px 0', maxWidth: 400 }}
       >
         <HeroHeading>
-          Practice the conversations<br />
+          Practice the<br />
+          conversations<br />
           that matter
         </HeroHeading>
       </motion.div>
@@ -49,10 +50,13 @@ export function Home() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3, duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
-        className="flex-1 flex items-center justify-center"
+        className="flex items-center justify-center"
+        style={{ paddingTop: 32, paddingBottom: 16 }}
       >
         <VoiceVisualization />
       </motion.div>
+
+      <div className="flex-1" />
 
       {/* Primary CTA */}
       <motion.div

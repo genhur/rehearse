@@ -1779,7 +1779,7 @@ export function Conversation() {
                       {turn.speaker === 'user' ? (
                         <UserSpeechBubble>{turn.text}</UserSpeechBubble>
                       ) : (
-                        <p className="font-geist text-r-text-primary" style={{ fontSize: 14, lineHeight: 1.55 }}>
+                        <p className="font-body text-r-text-primary" style={{ fontSize: 14, lineHeight: 1.55 }}>
                           {cleanAssistantText(turn.text)}
                         </p>
                       )}

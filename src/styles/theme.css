@@ -152,6 +152,7 @@
 
   /* Rehearse Design System — Typography */
   --font-display: 'Newsreader', serif;
+  --font-body: 'Geist', sans-serif;
   --font-geist: 'Geist Mono', monospace;
 
   --color-sidebar: var(--sidebar);

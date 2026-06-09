@@ -6,7 +6,7 @@ export function UserSpeechBubble({ children }: UserSpeechBubbleProps) {
   return (
     <div className="flex justify-end">
       <div
-        className="font-geist text-r-text-primary"
+        className="font-body text-r-text-primary"
         style={{
           backgroundColor: 'var(--r-user-bubble)',
           padding: '12px 16px',

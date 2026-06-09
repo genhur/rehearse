@@ -84,7 +84,7 @@ export function FeedbackRail({
               {/* Overall Assessment */}
               <div style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 24 }}>
                 <h3 className="font-display text-r-text-primary mb-3" style={{ fontSize: 18, fontWeight: 600 }}>Overall Assessment</h3>
-                <p className="font-geist text-r-text-secondary" style={{ fontSize: 14, lineHeight: 1.6 }}>
+                <p className="font-body text-r-text-secondary" style={{ fontSize: 14, lineHeight: 1.6 }}>
                   {report.overallAssessment}
                 </p>
               </div>
@@ -97,12 +97,12 @@ export function FeedbackRail({
                   </div>
                   <h3 className="font-display text-r-text-primary" style={{ fontSize: 16, fontWeight: 600 }}>How You Came Across</h3>
                 </div>
-                <p className="font-geist text-r-text-primary" style={{ fontSize: 14, lineHeight: 1.6 }}>
+                <p className="font-body text-r-text-primary" style={{ fontSize: 14, lineHeight: 1.6 }}>
                   {report.howYouCameAcross}
                 </p>
                 {audioAnalysis && (
                   <div className="mt-3 px-3 py-2 rounded-lg" style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}>
-                    <p className="font-geist text-r-text-secondary" style={{ fontSize: 12 }}>
+                    <p className="font-body text-r-text-secondary" style={{ fontSize: 12 }}>
                       Primary emotion: <span className="text-r-text-primary font-medium">{audioAnalysis.primaryEmotion}</span>
                       <span className="ml-1">
                         ({Math.round(audioAnalysis.confidence * 100)}% confidence)
@@ -121,7 +121,7 @@ export function FeedbackRail({
                       <div className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: 'var(--r-accent-green)' }}>
                         <span className="text-r-accent-mint text-xs">✓</span>
                       </div>
-                      <p className="font-geist text-r-text-secondary" style={{ fontSize: 14, lineHeight: 1.6 }}>{item}</p>
+                      <p className="font-body text-r-text-secondary" style={{ fontSize: 14, lineHeight: 1.6 }}>{item}</p>
                     </li>
                   ))}
                 </ul>
@@ -136,7 +136,7 @@ export function FeedbackRail({
                       <div className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: 'rgba(221,207,80,0.2)' }}>
                         <span className="text-r-accent-yellow text-xs">↗</span>
                       </div>
-                      <p className="font-geist text-r-text-secondary" style={{ fontSize: 14, lineHeight: 1.6 }}>{item}</p>
+                      <p className="font-body text-r-text-secondary" style={{ fontSize: 14, lineHeight: 1.6 }}>{item}</p>
                     </li>
                   ))}
                 </ul>
@@ -147,36 +147,36 @@ export function FeedbackRail({
                 <h3 className="font-display text-r-text-primary mb-4" style={{ fontSize: 18, fontWeight: 600 }}>Replay Moment</h3>
                 <div className="space-y-4">
                   <div>
-                    <p className="font-geist text-r-text-secondary mb-2" style={{ fontSize: 12, fontWeight: 500 }}>What you said</p>
-                    <p className="p-3 bg-r-surface rounded-lg font-geist text-r-text-primary" style={{ fontSize: 14, lineHeight: 1.6 }}>
+                    <p className="font-body text-r-text-secondary mb-2" style={{ fontSize: 12, fontWeight: 500 }}>What you said</p>
+                    <p className="p-3 bg-r-surface rounded-lg font-body text-r-text-primary" style={{ fontSize: 14, lineHeight: 1.6 }}>
                       "{report.replayMoment.originalMoment}"
                     </p>
                   </div>
 
                   <div>
-                    <p className="font-geist text-r-text-secondary mb-2" style={{ fontSize: 12, fontWeight: 500 }}>How you likely sounded</p>
-                    <p className="p-3 rounded-lg font-geist" style={{ fontSize: 14, lineHeight: 1.6, backgroundColor: 'rgba(221,207,80,0.1)', border: '1px solid rgba(221,207,80,0.2)', color: 'var(--r-accent-yellow)' }}>
+                    <p className="font-body text-r-text-secondary mb-2" style={{ fontSize: 12, fontWeight: 500 }}>How you likely sounded</p>
+                    <p className="p-3 rounded-lg font-body" style={{ fontSize: 14, lineHeight: 1.6, backgroundColor: 'rgba(221,207,80,0.1)', border: '1px solid rgba(221,207,80,0.2)', color: 'var(--r-accent-yellow)' }}>
                       {report.replayMoment.howYouLikelySounded}
                     </p>
                   </div>
 
                   <div>
-                    <p className="font-geist text-r-text-secondary mb-2" style={{ fontSize: 12, fontWeight: 500 }}>How it may have landed</p>
-                    <p className="p-3 bg-r-surface rounded-lg font-geist text-r-text-secondary" style={{ fontSize: 14, lineHeight: 1.6 }}>
+                    <p className="font-body text-r-text-secondary mb-2" style={{ fontSize: 12, fontWeight: 500 }}>How it may have landed</p>
+                    <p className="p-3 bg-r-surface rounded-lg font-body text-r-text-secondary" style={{ fontSize: 14, lineHeight: 1.6 }}>
                       {report.replayMoment.howItMayHaveLanded}
                     </p>
                   </div>
 
                   <div>
-                    <p className="font-geist text-r-text-secondary mb-2" style={{ fontSize: 12, fontWeight: 500 }}>Stronger version</p>
-                    <p className="p-3 rounded-lg font-geist text-r-accent-mint font-medium" style={{ fontSize: 14, lineHeight: 1.6, backgroundColor: 'rgba(152,225,211,0.1)', border: '2px solid rgba(152,225,211,0.2)' }}>
+                    <p className="font-body text-r-text-secondary mb-2" style={{ fontSize: 12, fontWeight: 500 }}>Stronger version</p>
+                    <p className="p-3 rounded-lg font-body text-r-accent-mint font-medium" style={{ fontSize: 14, lineHeight: 1.6, backgroundColor: 'rgba(152,225,211,0.1)', border: '2px solid rgba(152,225,211,0.2)' }}>
                       "{report.replayMoment.strongerVersion}"
                     </p>
                   </div>
 
                   <div>
-                    <p className="font-geist text-r-text-secondary mb-2" style={{ fontSize: 12, fontWeight: 500 }}>Delivery tip</p>
-                    <p className="p-3 rounded-lg font-geist" style={{ fontSize: 14, lineHeight: 1.6, backgroundColor: 'rgba(62,91,242,0.1)', border: '1px solid rgba(62,91,242,0.2)', color: 'var(--r-accent-blue)' }}>
+                    <p className="font-body text-r-text-secondary mb-2" style={{ fontSize: 12, fontWeight: 500 }}>Delivery tip</p>
+                    <p className="p-3 rounded-lg font-body" style={{ fontSize: 14, lineHeight: 1.6, backgroundColor: 'rgba(62,91,242,0.1)', border: '1px solid rgba(62,91,242,0.2)', color: 'var(--r-accent-blue)' }}>
                       {report.replayMoment.deliveryTip}
                     </p>
                   </div>

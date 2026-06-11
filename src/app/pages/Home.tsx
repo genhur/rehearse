@@ -3,7 +3,7 @@ import { useNavigate, useOutletContext } from 'react-router';
 import { StartCallIcon } from '../components/StartCallIcon';
 import { createSetupConversation } from '../../../lib/sessions';
 import { ScreenContainer } from '../components/ScreenContainer';
-import { NavigationIcon } from '../components/NavigationIcon';
+import { SessionsIcon } from '../components/SessionsIcon';
 import { HeroHeading } from '../components/HeroHeading';
 import { VoiceVisualization } from '../components/VoiceVisualization';
 import { PrimaryCTA } from '../components/PrimaryCTA';
@@ -28,7 +28,9 @@ export function Home() {
     <ScreenContainer className="flex flex-col">
       {/* Navigation */}
       <div style={{ padding: '76px 0 0 24px' }}>
-        <NavigationIcon onClick={openHistoryPanel} />
+        <button onClick={openHistoryPanel} className="text-r-text-primary" aria-label="Sessions">
+          <SessionsIcon size={24} />
+        </button>
       </div>
 
       {/* Hero Heading */}
@@ -50,8 +52,7 @@ export function Home() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3, duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
-        className="flex items-center justify-center"
-        style={{ paddingTop: 32, paddingBottom: 16 }}
+        style={{ padding: '80px 40px 0' }}
       >
         <VoiceVisualization />
       </motion.div>

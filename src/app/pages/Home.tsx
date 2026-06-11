@@ -51,7 +51,7 @@ export function Home() {
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3, duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
         className="flex items-center justify-center"
-        style={{ paddingTop: 32, paddingBottom: 16 }}
+        style={{ padding: '80px 32px 0' }}
       >
         <VoiceVisualization />
       </motion.div>

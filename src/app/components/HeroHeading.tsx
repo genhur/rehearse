@@ -9,7 +9,7 @@ export function HeroHeading({ children }: HeroHeadingProps) {
     <h1
       className="font-display text-r-text-primary"
       style={{
-        fontSize: 58,
+        fontSize: 64,
         fontWeight: 600,
         lineHeight: 0.96,
         letterSpacing: '-0.03em',

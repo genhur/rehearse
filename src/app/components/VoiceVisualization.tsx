@@ -15,7 +15,7 @@ const BARS = [
 ];
 
 const CONTAINER_HEIGHT = 288;
-const BAR_WIDTH_PCT = 4.83;
+const BAR_WIDTH = 16;
 
 export function VoiceVisualization({ className = '' }: { className?: string }) {
   return (
@@ -30,7 +30,7 @@ export function VoiceVisualization({ className = '' }: { className?: string }) {
           style={{
             left: `${bar.left}%`,
             top: bar.top,
-            width: `${BAR_WIDTH_PCT}%`,
+            width: BAR_WIDTH,
             height: bar.height,
             backgroundColor: bar.color,
             borderRadius: 40,

@@ -4,6 +4,8 @@
 
 Solo project: design, product, and build. Won at the Rebuild × ElevenLabs hackathon.
 
+WIP. Polished mobile web/app coming soon.
+
 ---
 
 Most communication advice tells you *what* to say. But the same words land completely differently depending on *how* you say them — confident or hesitant, empathetic or defensive. The hard part of a difficult conversation isn't usually the argument. It's the delivery, under pressure, in real time.

@@ -8,6 +8,8 @@ WIP. Polished mobile web/app coming soon.
 
 ---
 
+High-stakes interpersonal skills, like conflict, boundaries, hard feedback, asking for what you want, have no flight simulator. You learn them by failing live, on the people who matter, and you may not get another chance. Rehearse is the flight simulator. Difficult conversations are the first domain; the underlying idea is creating reps where reps didn't exist.
+
 Most communication advice tells you *what* to say. But the same words land completely differently depending on *how* you say them — confident or hesitant, empathetic or defensive. The hard part of a difficult conversation isn't usually the argument. It's the delivery, under pressure, in real time.
 
 Rehearse lets you rehearse that. Describe a conversation you're dreading, practice it out loud against an AI playing the other person, get honest feedback on how you came across, and run it again.
@@ -28,11 +30,12 @@ You describe the conversation. Rehearse asks a few questions to ground the scena
 
 ## What it's good for
 
-A raise conversation you keep rehearsing in your head. Delivering bad news to a cofounder. Setting a boundary with someone you love. Anything where you get one real attempt and the stakes are high enough that you'd want a few practice ones first.
+A raise conversation you keep rehearsing in your head. Delivering bad news to a cofounder. Setting a boundary with someone you love. Anything where you get one real attempt and the stakes are high enough that you'd want a few practice ones first. 
 
 ## Built with
 
 ElevenLabs Conversational AI for the real-time voice layer, with React/TypeScript on the front end. The voice quality is ElevenLabs'. My work is the experience around it: the scenario setup, the practice loop, the debrief structure, and how feedback gets surfaced.
+
 ## Tech
 
 Rehearse was built using:

@@ -1,83 +1,36 @@
-WIP
-
 # Rehearse
 
-Rehearse is a voice AI that helps people prepare for difficult conversations before they happen.
+**A voice AI for practicing hard conversations before you have them.**
 
-Describe a conversation, practice it with an AI simulation, review what happened, and try again.
+Solo project: design, product, and build. Won at the Rebuild × ElevenLabs hackathon.
 
-The idea came from a simple observation: Many of the outcomes that shape our lives come down to our ability to have difficult conversations. The conversation where you set a boundary with someone you love. The conversation where you tell your team the company is in trouble. 
+---
 
-This is arguably the most important skill in the world, yet most people have no way to practice them with gentle and honest feedback. So we fumble reputations, relationships, and opportunities, and struggle to understand why. 
+Most communication advice tells you *what* to say. But the same words land completely differently depending on *how* you say them — confident or hesitant, empathetic or defensive. The hard part of a difficult conversation isn't usually the argument. It's the delivery, under pressure, in real time.
 
-Whether you're asking your manager for a promotion, setting a boundary with a loved one, or delivering difficult news to a teammate, the stakes often feel high because you only get one real attempt.
+Rehearse lets you rehearse that. Describe a conversation you're dreading, practice it out loud against an AI playing the other person, get honest feedback on how you came across, and run it again.
 
-Rehearse gives people a chance to practice and get objective feedback so they can do better.
+While testing it, I started getting defensive in a simulated argument even though I knew it was an AI and the relationship was fake. I could hear myself justifying, retreating into old habits. The debrief named it afterward. That's the whole thesis of the project in one moment: people mask their real relational patterns behind scripts and prepared answers, but a live voice roleplay surfaces the habits underneath. Text can't do that.
 
-## What It Does
+## How it works
 
-Users start by describing a conversation they need to have.
+You describe the conversation. Rehearse asks a few questions to ground the scenario, then generates a voice partner and runs the conversation live, capturing a transcript as you go. When it reaches a natural end, you get a debrief — delivered by voice, then as a written report — covering clarity, confidence, empathy, assertiveness, listening, and emotional regulation, citing specific moments rather than generalities. Then you run it again and apply what you just heard.
 
-Rehearse asks a few questions to understand the situation, then generates a voice simulation of the other person. During the conversation, a live transcript is captured so users can review exactly what was said.
+## A few design decisions
 
-Once the conversation reaches a natural conclusion, Rehearse generates a feedback report that evaluates:
+**Practice loop over single verdict.** The product is built around "run it again," not a one-shot grade. The insight isn't knowing you came across badly; it's getting to immediately try the better version while it's fresh. The loop is the product.
 
-- Clarity
-- Confidence
-- Empathy
-- Assertiveness
-- Listening
-- Emotional regulation
+**Feedback after, not coaching during.** I deliberately kept the AI from interrupting to coach mid-conversation. Real conversations don't pause to correct you, and the value is in staying in the pressure, then reviewing.
 
-The report references specific moments from the conversation and highlights both strengths and opportunities for improvement.
+**Voice debrief before the written report.** Hearing the feedback spoken, in the same modality you just failed or succeeded in, lands differently than reading a scorecard. The written report is the reference; the voice debrief is the gut-punch.
 
-Users can then run the conversation again and immediately apply the feedback.
+## What it's good for
 
-## Current Features
+A raise conversation you keep rehearsing in your head. Delivering bad news to a cofounder. Setting a boundary with someone you love. Anything where you get one real attempt and the stakes are high enough that you'd want a few practice ones first.
 
-- Real-time voice conversations powered by ElevenLabs
-- AI-generated conversation partners
-- Live conversation transcripts
-- Debrief by emotionally intelligent voice AI covering strengths, opportunity areas, suggestions
-- Communication feedback reports
-- Session history with saved conversations
-- Conversation titles generated from session context
-- One-click "Run it again" practice loops
-- Support for both professional and personal scenarios
+## Built with
 
-## Example Scenarios
-
-### Professional
-
-- Asking for a raise or promotion
-- Delivering difficult news to a cofounder
-- Giving constructive feedback
-- Handling conflict with a teammate
-- Navigating a performance conversation or interview
-
-### Personal
-
-- Setting boundaries
-- Addressing relationship concerns
-- Having difficult family conversations
-- Expressing needs more clearly
-- Preparing for a breakup conversation
-
-## Why Voice
-
-Most communication advice focuses on what to say. In practice, how something is said often matters just as much.The same message can sound confident, hesitant, defensive, empathetic, dismissive, or reassuring depending on delivery.
-
-Voice creates an opportunity to practice both content and communication style. Rehearse is designed to help users understand not only whether they made the right argument, but also how they may have come across to the other person.
-
-One thing that surprised me while testing Rehearse was that I started getting defensive during a simulated argument, even though I knew I was talking to an AI and we were roleplaying a fake relationship. I could hear myself justifying and retreating into familiar patterns. The debrief called it out afterward. People can mask harmful relational patterns behind scripts, therapy sessions, and professional training, but these roleplay sessions can surface real habits.  
-
-
-## Why This Is Interesting
-
-Rehearse explores what becomes possible when advances in emotionally intelligent voice AI turn conversation itself into a medium for learning. Instead of helping users write a difficult message, it helps them prepare for the actual conversation.
-
-The long-term vision is a system that helps people build communication skills through repeated practice, much like language-learning apps help people build fluency through repetition. As voice AI becomes more natural, emotionally aware, and conversationally capable, it can evolve from an assistant that gives advice into a practice environment where people develop confidence, empathy, leadership, and difficult interpersonal skills before the moments that matter most.
-
+ElevenLabs Conversational AI for the real-time voice layer, with React/TypeScript on the front end. The voice quality is ElevenLabs'. My work is the experience around it: the scenario setup, the practice loop, the debrief structure, and how feedback gets surfaced.
 ## Tech
 
 Rehearse was built using:

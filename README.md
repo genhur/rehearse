@@ -24,7 +24,7 @@ You describe the conversation. Rehearse asks a few questions to ground the scena
 
 **Feedback after, not coaching during.** I deliberately kept the AI from interrupting to coach mid-conversation. Real conversations don't pause to correct you, and the value is in staying in the pressure, then reviewing.
 
-**Voice debrief before the written report.** Hearing the feedback spoken, in the same modality you just failed or succeeded in, lands differently than reading a scorecard. The written report is the reference; the voice debrief is the gut-punch.
+**Voice debrief before the written report.** Hearing the feedback spoken, in the same modality you just failed or succeeded in, lands differently than reading a scorecard. The written report is the reference; the voice debrief makes the feedback more real.
 
 ## What it's good for
 

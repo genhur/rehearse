@@ -2,7 +2,7 @@
 
 **A voice AI for practicing hard conversations before you have them.**
 
-Solo project: design, product, and build. Won at the Rebuild × ElevenLabs hackathon.
+Solo project: design, product, and build. Won **Most Useful** at the Rebuild × ElevenLabs hackathon.
 
 WIP. Polished mobile web/app coming soon.
 

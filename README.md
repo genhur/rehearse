@@ -55,7 +55,8 @@ Prototype at hackathon:
 <img width="783" height="401" alt="Screenshot 2026-06-06 at 7 55 52 PM" src="https://github.com/user-attachments/assets/674b5fc2-4807-4ccb-82b8-e0129935f6c8" />
 
 Design WIP
-<img width="920" height="294" alt="Screenshot 2026-06-21 at 8 11 11 PM" src="https://github.com/user-attachments/assets/2b58d4c1-2c0b-4f3a-bb65-c98f72ed7988" />
+<img width="2003" height="618" alt="Screenshot 2026-06-21 at 8 12 10 PM" src="https://github.com/user-attachments/assets/c5b1e1eb-017e-41b6-b325-cde30727a2e8" />
+
 
 
 

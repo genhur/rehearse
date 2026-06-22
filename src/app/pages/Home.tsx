@@ -1,11 +1,9 @@
 import { motion } from 'motion/react';
 import { useNavigate, useOutletContext } from 'react-router';
-import { StartCallIcon } from '../components/StartCallIcon';
 import { createSetupConversation } from '../../../lib/sessions';
 import { ScreenContainer } from '../components/ScreenContainer';
 import { SessionsIcon } from '../components/SessionsIcon';
 import { HeroHeading } from '../components/HeroHeading';
-import { VoiceVisualization } from '../components/VoiceVisualization';
 import { PrimaryCTA } from '../components/PrimaryCTA';
 
 interface OutletContext {
@@ -19,59 +17,47 @@ export function Home() {
 
   const handleStartSession = () => {
     const setupConversation = createSetupConversation(
-      'What difficult conversation are you avoiding today?'
+      'What conversation would you like to rehearse?'
     );
     navigate(`/conversation/setup/${setupConversation.id}`);
   };
 
   return (
     <ScreenContainer className="flex flex-col">
-      {/* Navigation */}
-      <div style={{ padding: '76px 0 0 24px' }}>
-        <button onClick={openHistoryPanel} className="text-r-text-primary" aria-label="Sessions">
-          <SessionsIcon size={24} />
+      {/* Quiet entry to past sessions — present but never loud */}
+      <div style={{ padding: '64px 0 0 24px' }}>
+        <button
+          onClick={openHistoryPanel}
+          className="text-r-text-tertiary transition-opacity hover:opacity-70"
+          aria-label="Sessions"
+        >
+          <SessionsIcon size={22} />
         </button>
       </div>
 
-      {/* Hero Heading */}
-      <motion.div
-        initial={{ opacity: 0, y: 18 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
-        style={{ padding: '72px 24px 0', maxWidth: 400 }}
-      >
-        <HeroHeading>
-          Practice the<br />
-          conversations<br />
-          that matter
-        </HeroHeading>
-      </motion.div>
-
-      {/* Voice Visualization */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.3, duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
-        style={{ padding: '80px 48px 0' }}
-      >
-        <VoiceVisualization />
-      </motion.div>
-
-      <div className="flex-1" />
+      {/* Hero — centered, calm, the whole point of the screen */}
+      <div className="flex-1 flex items-center justify-center px-8">
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1.3, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <HeroHeading align="center" size={40}>
+            Practice<br />
+            conversations<br />
+            that matter.
+          </HeroHeading>
+        </motion.div>
+      </div>
 
       {/* Primary CTA */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5, duration: 1.0, ease: [0.16, 1, 0.3, 1] }}
-        style={{ padding: '0 24px 24px' }}
+        transition={{ delay: 0.45, duration: 1.0, ease: [0.16, 1, 0.3, 1] }}
+        style={{ padding: '0 24px calc(24px + env(safe-area-inset-bottom))' }}
       >
-        <PrimaryCTA
-          onClick={handleStartSession}
-          icon={<StartCallIcon size={20} />}
-        >
-          Start session
-        </PrimaryCTA>
+        <PrimaryCTA onClick={handleStartSession}>Start a new session</PrimaryCTA>
       </motion.div>
     </ScreenContainer>
   );

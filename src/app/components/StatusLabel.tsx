@@ -2,14 +2,15 @@ interface StatusLabelProps {
   children: string;
 }
 
+/** Quiet state line (e.g. "Call ended.") — Founders Grotesk, muted navy. */
 export function StatusLabel({ children }: StatusLabelProps) {
   return (
     <span
-      className="font-geist text-r-text-secondary uppercase block text-center"
+      className="font-body text-r-text-secondary block text-center"
       style={{
-        fontSize: 13,
-        fontWeight: 300,
-        letterSpacing: '0.08em',
+        fontSize: 14,
+        fontWeight: 500,
+        letterSpacing: '-0.005em',
       }}
     >
       {children}

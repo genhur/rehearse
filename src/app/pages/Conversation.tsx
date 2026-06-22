@@ -10,6 +10,8 @@ import { Play, Mic } from 'lucide-react';
 import { StartCallIcon } from '../components/StartCallIcon';
 import { audioRecordingService, audioAnalysisService } from '../../../lib/audio-analysis';
 import { UserSpeechBubble } from '../components/UserSpeechBubble';
+import { TranscriptMessage } from '../components/TranscriptMessage';
+import { useAmbient } from '../components/AmbientContext';
 import { UserActivityIndicator } from '../components/UserActivityIndicator';
 import { SystemActivityIndicator } from '../components/SystemActivityIndicator';
 import { StatusLabel } from '../components/StatusLabel';
@@ -53,9 +55,18 @@ export function Conversation() {
   const [currentAttempt, setCurrentAttempt] = useState<RehearsalAttempt | null>(null);
   const [transcript, setTranscript] = useState<TranscriptTurn[]>([]);
   const [conversationState, setConversationState] = useState<ConversationState>('idle');
+  const { setIntensity: setAmbientIntensity } = useAmbient();
   const showDevTools = useDevTools();
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [elevenLabsMode, setElevenLabsMode] = useState<Mode>('listening');
+
+  // Let the ambient gradient breathe while either participant is speaking,
+  // and settle to near-still when idle. The background is the voice visualization.
+  useEffect(() => {
+    const speaking = isSessionActive && (conversationState === 'speaking' || conversationState === 'listening');
+    setAmbientIntensity(speaking ? 1 : 0);
+    return () => setAmbientIntensity(0);
+  }, [isSessionActive, conversationState, setAmbientIntensity]);
   const [highlightedTurnId, setHighlightedTurnId] = useState<string | null>(null);
   const [showKeyMoments, setShowKeyMoments] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -1731,26 +1742,30 @@ export function Conversation() {
 
   return (
     <div
-      className="min-h-screen bg-r-bg text-r-text-primary flex flex-col"
+      className="min-h-screen bg-transparent text-r-text-primary flex flex-col"
       style={{
-        '--background': 'var(--r-bg)',
+        '--background': 'transparent',
         '--foreground': 'var(--r-text-primary)',
         '--card': 'var(--r-surface)',
         '--card-foreground': 'var(--r-text-primary)',
-        '--muted': '#333333',
+        '--muted': 'rgba(2, 30, 59, 0.06)',
         '--muted-foreground': 'var(--r-text-secondary)',
-        '--border': 'rgba(255, 255, 255, 0.1)',
+        '--border': 'var(--r-hairline)',
         '--header-height': '60px',
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
       } as React.CSSProperties}
     >
-      {/* Minimal dark header */}
-      <div className="flex items-center sticky top-0 z-20 bg-r-bg" style={{ padding: '20px 24px' }}>
-        <NavigationIcon onClick={openHistoryPanel} />
-        <div className="flex-1 px-4 min-w-0">
-          <h1 className="font-display text-r-text-primary truncate" style={{ fontSize: 22, fontWeight: 500 }}>
+      {/* Quiet scenario label — Founders Grotesk, top-left */}
+      <div className="flex items-center sticky top-0 z-20" style={{ padding: '28px 24px 12px' }}>
+        <button onClick={openHistoryPanel} className="text-left min-w-0" aria-label="Sessions">
+          <span
+            className="font-body text-r-text-secondary block truncate"
+            style={{ fontSize: 14, fontWeight: 500, letterSpacing: '-0.005em' }}
+          >
             {getSessionTitle()}
-          </h1>
-        </div>
+          </span>
+        </button>
       </div>
 
       {/* Main content */}
@@ -1779,26 +1794,24 @@ export function Conversation() {
               <div className={`max-w-2xl mx-auto transition-all duration-300 ${
                 isFeedbackOpen ? 'max-w-xl' : 'max-w-2xl'
               }`}>
-                <div className="space-y-4">
+                <div className="space-y-7">
                   {transcript.map((turn) => (
                     <motion.div
                       key={turn.id}
                       id={`turn-${turn.id}`}
                       initial={{ opacity: 0, y: 6 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3 }}
+                      transition={{ duration: 0.4 }}
                       className={`transition-all duration-300 ${
                         highlightedTurnId === turn.id
-                          ? 'ring-1 ring-r-accent-purple/40 rounded-xl p-2'
+                          ? 'ring-1 ring-r-ink/15 rounded-xl p-2'
                           : ''
                       }`}
                     >
                       {turn.speaker === 'user' ? (
                         <UserSpeechBubble>{turn.text}</UserSpeechBubble>
                       ) : (
-                        <p className="font-body text-r-text-primary" style={{ fontSize: 16, lineHeight: 1.55 }}>
-                          {cleanAssistantText(turn.text)}
-                        </p>
+                        <TranscriptMessage content={cleanAssistantText(turn.text)} />
                       )}
                     </motion.div>
                   ))}
@@ -1861,8 +1874,8 @@ export function Conversation() {
                   )}
                   <button
                     onClick={handleRunItAgain}
-                    className="font-geist text-r-text-secondary uppercase flex items-center gap-2"
-                    style={{ fontSize: 14, fontWeight: 500, letterSpacing: '0.06em' }}
+                    className="font-body text-r-text-secondary flex items-center gap-2 transition-opacity hover:opacity-70"
+                    style={{ fontSize: 15, fontWeight: 500, letterSpacing: '-0.005em' }}
                   >
                     <Play className="w-4 h-4" />
                     Run it again
@@ -1890,8 +1903,8 @@ export function Conversation() {
               <div className={`max-w-2xl mx-auto transition-all duration-300 ${
                 isFeedbackOpen ? 'max-w-xl' : 'max-w-2xl'
               }`}>
-                {/* End call button — bottom right */}
-                <div className="flex justify-end mb-4">
+                {/* End session — bottom center */}
+                <div className="flex justify-center mb-2">
                   <EndCallButton onClick={handleEndConversation} />
                 </div>
 

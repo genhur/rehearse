@@ -1,11 +1,13 @@
-<img width="1479" height="458" alt="Screenshot 2026-06-21 at 8 13 00 PM" src="https://github.com/user-attachments/assets/7f01bf6a-a85d-4861-8202-86c21c855400" />
 # Rehearse
 
 **A voice AI for practicing hard conversations before you have them.**
 
 Solo project: design, product, and build. Won **Most Useful** at the Rebuild × ElevenLabs hackathon.
 
-WIP. Polished mobile web/app coming soon.
+Design WIP. Polished mobile web/app coming soon.
+
+<img width="1479" height="458" alt="Screenshot 2026-06-21 at 8 13 00 PM" src="https://github.com/user-attachments/assets/450b26d8-0208-4203-bc45-9f7b74dcfb2f" />
+
 
 ---
 
@@ -54,12 +56,6 @@ Rebuild X ElevenLabs Hackathon 2026
 
 Prototype at hackathon:
 <img width="783" height="401" alt="Screenshot 2026-06-06 at 7 55 52 PM" src="https://github.com/user-attachments/assets/674b5fc2-4807-4ccb-82b8-e0129935f6c8" />
-
-Design WIP
-<img width="1479" height="458" alt="Screenshot 2026-06-21 at 8 13 00 PM" src="https://github.com/user-attachments/assets/b484240e-da22-4c08-ac8c-4ecfffe98580" />
-
-
-
 
 
 

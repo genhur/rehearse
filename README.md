@@ -39,10 +39,6 @@ A raise conversation you keep rehearsing in your head. Delivering bad news to a 
 
 ElevenLabs Conversational AI for the real-time voice layer, with React/TypeScript on the front end. The voice quality is ElevenLabs'. My work is the experience around it: the scenario setup, the practice loop, the debrief structure, and how feedback gets surfaced.
 
-## Tech
-
-Rehearse was built using:
-
 * ElevenLabs Conversational AI for real-time voice conversations
 * React and TypeScript for the web application
 * Vite for frontend tooling

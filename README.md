@@ -1,3 +1,4 @@
+<img width="1479" height="458" alt="Screenshot 2026-06-21 at 8 13 00 PM" src="https://github.com/user-attachments/assets/7f01bf6a-a85d-4861-8202-86c21c855400" />
 # Rehearse
 
 **A voice AI for practicing hard conversations before you have them.**
@@ -55,7 +56,8 @@ Prototype at hackathon:
 <img width="783" height="401" alt="Screenshot 2026-06-06 at 7 55 52 PM" src="https://github.com/user-attachments/assets/674b5fc2-4807-4ccb-82b8-e0129935f6c8" />
 
 Design WIP
-<img width="2003" height="618" alt="Screenshot 2026-06-21 at 8 12 10 PM" src="https://github.com/user-attachments/assets/c5b1e1eb-017e-41b6-b325-cde30727a2e8" />
+<img width="1479" height="458" alt="Screenshot 2026-06-21 at 8 13 00 PM" src="https://github.com/user-attachments/assets/5c1cb0b6-7f3a-496d-abcd-4b56d37dfda5" />
+
 
 
 

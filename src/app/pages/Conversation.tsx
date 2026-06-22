@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { useNavigate, useParams, useOutletContext } from 'react-router';
 import { Button } from '../components/Button';
-import { FeedbackRail } from '../components/FeedbackRail';
 import { getSession, sessionManager, getCurrentAttempt, getSetupConversation, updateSetupConversation, commitSetupToSession, endCurrentAttempt as endSessionAttempt, type RehearsalSession, type RehearsalAttempt, type SetupConversation, type TranscriptTurn, type AudioAnalysis, type FeedbackReport, type RehearsalPhase } from '../../../lib/sessions';
 import { Conversation as ElevenLabsConversation } from '@11labs/client';
 import type { Mode, Status } from '@11labs/client';
@@ -12,12 +11,9 @@ import { audioRecordingService, audioAnalysisService } from '../../../lib/audio-
 import { UserSpeechBubble } from '../components/UserSpeechBubble';
 import { TranscriptMessage } from '../components/TranscriptMessage';
 import { useAmbient } from '../components/AmbientContext';
-import { UserActivityIndicator } from '../components/UserActivityIndicator';
-import { SystemActivityIndicator } from '../components/SystemActivityIndicator';
 import { StatusLabel } from '../components/StatusLabel';
 import { ViewFeedbackButton } from '../components/ViewFeedbackButton';
 import { EndCallButton } from '../components/EndCallButton';
-import { NavigationIcon } from '../components/NavigationIcon';
 
 const AGENT_ID = 'agent_4901ktej496kfp1a1kwj03q037ey';
 
@@ -1331,20 +1327,8 @@ export function Conversation() {
   };
 
   const handleViewFeedback = () => {
-    setIsFeedbackOpen(true);
-  };
-
-  const handleCloseFeedback = () => {
-    setIsFeedbackOpen(false);
-  };
-
-  const handleJumpToMoment = (turnId: string) => {
-    setHighlightedTurnId(turnId);
-    const turnElement = document.getElementById(`turn-${turnId}`);
-    turnElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    
-    // Clear highlight after a moment
-    setTimeout(() => setHighlightedTurnId(null), 3000);
+    const id = session?.id ?? sessionId;
+    if (id) navigate(`/debrief/${id}`);
   };
 
   const handleRunItAgain = () => {
@@ -1768,32 +1752,19 @@ export function Conversation() {
         </button>
       </div>
 
-      {/* Main content */}
-      <div className="flex-1 flex">
-        {/* Conversation area */}
-        <div className={`flex-1 flex flex-col transition-all duration-300 ${
-          isFeedbackOpen ? 'mr-0' : ''
-        }`}>
+      {/* Main content — single immersive mobile column */}
+      <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col">
           {/* Transcript */}
-          <div className="flex-1 overflow-y-auto px-6 py-8">
+          <div className="flex-1 overflow-y-auto px-6 py-6">
             {transcript.length === 0 ? (
               <div className="flex items-center justify-center h-full">
-                <div className="text-center">
-                  <div
-                    className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
-                    style={{ backgroundColor: 'var(--r-surface)' }}
-                  >
-                    <StartCallIcon size={32} className="text-r-text-secondary" />
-                  </div>
-                  <p className="text-r-text-secondary font-geist mb-2" style={{ fontSize: 14 }}>
-                    Starting your conversation practice...
-                  </p>
-                </div>
+                <p className="text-r-text-secondary font-body text-center" style={{ fontSize: 15 }}>
+                  Starting your conversation…
+                </p>
               </div>
             ) : (
-              <div className={`max-w-2xl mx-auto transition-all duration-300 ${
-                isFeedbackOpen ? 'max-w-xl' : 'max-w-2xl'
-              }`}>
+              <div className="w-full">
                 <div className="space-y-7">
                   {transcript.map((turn) => (
                     <motion.div
@@ -1816,42 +1787,7 @@ export function Conversation() {
                     </motion.div>
                   ))}
 
-                  {/* Voice activity indicators */}
-                  <AnimatePresence>
-                    {isSessionActive && conversationState === 'speaking' && (
-                      <motion.div
-                        key="system-indicator"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="flex justify-start py-2"
-                      >
-                        <SystemActivityIndicator />
-                      </motion.div>
-                    )}
-                    {isSessionActive && conversationState === 'listening' && (
-                      <motion.div
-                        key="user-indicator"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="flex justify-end py-2"
-                      >
-                        <UserActivityIndicator />
-                      </motion.div>
-                    )}
-                    {isSessionActive && conversationState === 'thinking' && (
-                      <motion.div
-                        key="thinking-indicator"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="flex justify-start py-2"
-                      >
-                        <SystemActivityIndicator />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  {/* Speaking / thinking state is shown by the ambient background, not bars. */}
 
                   <div ref={messagesEndRef} />
                 </div>
@@ -1862,9 +1798,7 @@ export function Conversation() {
           {/* Call ended state */}
           {currentAttempt?.status === 'complete' && !isGeneratingFeedback && (
             <div className="px-6 pb-8">
-              <div className={`mx-auto transition-all duration-300 ${
-                isFeedbackOpen ? 'max-w-xl' : 'max-w-2xl'
-              }`}>
+              <div className="w-full">
                 <div className="flex flex-col items-center gap-6 py-8">
                   <StatusLabel>Call ended.</StatusLabel>
                   {currentAttempt.feedbackReport && (
@@ -1899,10 +1833,8 @@ export function Conversation() {
 
           {/* Voice interaction area (active call) */}
           {(isSessionActive || (Boolean(setupConversation) && currentAttempt?.status !== 'complete')) && (
-            <div className="px-6 pb-6">
-              <div className={`max-w-2xl mx-auto transition-all duration-300 ${
-                isFeedbackOpen ? 'max-w-xl' : 'max-w-2xl'
-              }`}>
+            <div className="px-6 pb-6" style={{ paddingBottom: 'calc(24px + env(safe-area-inset-bottom))' }}>
+              <div className="w-full">
                 {/* End session — bottom center */}
                 <div className="flex justify-center mb-2">
                   <EndCallButton onClick={handleEndConversation} />
@@ -1913,10 +1845,10 @@ export function Conversation() {
                   <div className="text-center">
                     <button
                       onClick={handleStartConversation}
-                      className="font-geist text-r-text-secondary"
-                      style={{ fontSize: 14 }}
+                      className="font-body text-r-text-secondary"
+                      style={{ fontSize: 15 }}
                     >
-                      Tap to start voice conversation
+                      Tap to start
                     </button>
                   </div>
                 )}
@@ -1978,20 +1910,6 @@ export function Conversation() {
             </div>
           )}
         </div>
-
-        {/* Feedback Rail */}
-        {isFeedbackOpen && currentAttempt?.feedbackReport && (
-          <div className="w-2/5 min-w-[400px] max-w-[500px]">
-            <FeedbackRail
-              report={currentAttempt.feedbackReport}
-              audioAnalysis={currentAttempt.audioAnalysis}
-              isOpen={isFeedbackOpen}
-              onClose={handleCloseFeedback}
-              onJumpToMoment={handleJumpToMoment}
-              onRunAgain={handleRunItAgain}
-            />
-          </div>
-        )}
       </div>
     </div>
   );

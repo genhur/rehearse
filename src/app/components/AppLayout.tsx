@@ -7,7 +7,6 @@ import { AmbientProvider, useAmbient } from './AmbientContext';
 
 /** Warm while preparing (home, setup); cool once in the room and reflecting. */
 function moodForPath(pathname: string): AmbientMood {
-  if (pathname.startsWith('/simulation')) return 'cool';
   if (pathname.startsWith('/conversation')) return 'cool';
   if (pathname.startsWith('/debrief')) return 'cool';
   return 'warm';

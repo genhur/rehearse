@@ -8,7 +8,7 @@ interface ScreenContainerProps {
 export function ScreenContainer({ children, className = '' }: ScreenContainerProps) {
   return (
     <div
-      className={`min-h-screen bg-r-bg text-r-text-primary ${className}`}
+      className={`min-h-screen bg-transparent text-r-text-primary ${className}`}
       style={{
         paddingTop: 'env(safe-area-inset-top)',
         paddingBottom: 'env(safe-area-inset-bottom)',

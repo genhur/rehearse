@@ -2,22 +2,21 @@ interface UserSpeechBubbleProps {
   children: string;
 }
 
+/** The user's own lines — right-aligned Ivar Text, no bubble, same voice as the script. */
 export function UserSpeechBubble({ children }: UserSpeechBubbleProps) {
   return (
     <div className="flex justify-end">
-      <div
-        className="font-body text-r-text-primary"
+      <p
+        className="font-display text-r-text-primary text-right"
         style={{
-          backgroundColor: 'var(--r-user-bubble)',
-          padding: '12px 16px',
-          borderRadius: '20px 20px 4px 20px',
-          maxWidth: '80%',
-          fontSize: 16,
-          lineHeight: 1.55,
+          maxWidth: '88%',
+          fontSize: 21,
+          lineHeight: 1.42,
+          letterSpacing: '-0.01em',
         }}
       >
         {children}
-      </div>
+      </p>
     </div>
   );
 }

@@ -1,234 +1,152 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, ReactNode } from 'react';
 import { motion } from 'motion/react';
-import { useNavigate, useParams } from 'react-router';
-import { Button } from '../components/Button';
-import { ArrowRight, Mic, Play, Home } from 'lucide-react';
-import { getSession, sessionManager, type RehearsalSession, type RehearsalAttempt, type FeedbackReport, type AudioAnalysis } from '../../../lib/sessions';
+import { useNavigate, useParams, useOutletContext } from 'react-router';
+import { ScreenContainer } from '../components/ScreenContainer';
+import { DebriefSection } from '../components/DebriefSection';
+import { PrimaryCTA } from '../components/PrimaryCTA';
+import { getSession, sessionManager, type RehearsalSession, type RehearsalAttempt } from '../../../lib/sessions';
+
+interface OutletContext {
+  openHistoryPanel: () => void;
+}
+
+/** Thin check mark — quiet affirmation, never a badge. */
+function Check() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="var(--r-text-tertiary)"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ flexShrink: 0, marginTop: 6 }}
+    >
+      <path d="M5 12.5l4.5 4.5L19 7" />
+    </svg>
+  );
+}
+
+function CheckList({ items }: { items: string[] }) {
+  return (
+    <ul style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {items.map((item, i) => (
+        <li key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <Check />
+          <span
+            className="font-display text-r-text-primary"
+            style={{ fontSize: 19, lineHeight: 1.45, letterSpacing: '-0.01em' }}
+          >
+            {item}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Centered({ children }: { children: ReactNode }) {
+  return (
+    <ScreenContainer className="flex items-center justify-center px-8">
+      <p className="font-body text-r-text-secondary" style={{ fontSize: 15 }}>{children}</p>
+    </ScreenContainer>
+  );
+}
 
 export function Debrief() {
   const navigate = useNavigate();
   const { sessionId } = useParams<{ sessionId: string }>();
+  const { openHistoryPanel } = useOutletContext<OutletContext>();
   const [session, setSession] = useState<RehearsalSession | null>(null);
   const [currentAttempt, setCurrentAttempt] = useState<RehearsalAttempt | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function loadSession() {
-      if (!sessionId) {
-        navigate('/');
-        return;
-      }
-
-      const sessionData = getSession(sessionId);
-      if (!sessionData) {
-        setError('Session not found. Please start a new conversation.');
-        setLoading(false);
-        return;
-      }
-
-      const attemptData = sessionManager.getCurrentAttempt(sessionId);
-      if (!attemptData || !attemptData.feedbackReport) {
-        setError('No feedback report available. Complete a conversation to see analysis.');
-        setLoading(false);
-        return;
-      }
-
-      setSession(sessionData);
-      setCurrentAttempt(attemptData);
-      setLoading(false);
+    if (!sessionId) {
+      navigate('/');
+      return;
     }
-
-    loadSession();
+    const sessionData = getSession(sessionId);
+    if (!sessionData) {
+      setError('That session is no longer available.');
+      setLoading(false);
+      return;
+    }
+    const attemptData = sessionManager.getCurrentAttempt(sessionId);
+    if (!attemptData || !attemptData.feedbackReport) {
+      setError('No debrief yet. Finish a conversation to see your reflection.');
+      setLoading(false);
+      return;
+    }
+    setSession(sessionData);
+    setCurrentAttempt(attemptData);
+    setLoading(false);
   }, [sessionId, navigate]);
 
-  const handleRunAgain = () => {
-    navigate(`/conversation/${sessionId}`);
-  };
-
-  const handleBackHome = () => {
-    navigate('/');
-  };
-
-  const handleViewConversation = () => {
-    navigate(`/conversation/${sessionId}`);
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <Mic className="w-8 h-8 animate-pulse mx-auto mb-4 text-muted-foreground" />
-          <p className="text-muted-foreground">Loading your feedback...</p>
-        </div>
-      </div>
-    );
-  }
-
+  if (loading) return <Centered>Gathering your debrief…</Centered>;
   if (error || !session || !currentAttempt?.feedbackReport) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center max-w-md">
-          <p className="text-muted-foreground mb-4">{error || 'Feedback not available'}</p>
-          <Button onClick={handleBackHome} variant="secondary">
-            Back to Home
-          </Button>
-        </div>
-      </div>
-    );
+    return <Centered>{error || 'Debrief not available.'}</Centered>;
   }
 
-  const { feedbackReport, audioAnalysis } = currentAttempt;
+  const { feedbackReport } = currentAttempt;
+  const scenarioLabel = session.characterRole
+    ? `Talk with ${session.characterRole}`
+    : session.scenario;
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-4xl mx-auto px-6 py-16">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-12"
-        >
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center">
-              <Mic className="w-4 h-4 text-white" />
-            </div>
-            <h1 className="text-2xl font-bold">Feedback Report</h1>
-          </div>
-          <p className="text-lg text-muted-foreground mb-2">{session.scenario}</p>
-          <p className="text-sm text-muted-foreground">
-            Attempt {currentAttempt.attemptNumber} · {currentAttempt.transcript.length} messages
-            {audioAnalysis && ` · Audio analyzed`}
-          </p>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="space-y-8"
-        >
-          {/* Overall Assessment */}
-          <div className="bg-card border border-border rounded-2xl p-8">
-            <h2 className="text-xl font-semibold mb-4">Overall Assessment</h2>
-            <p className="text-muted-foreground leading-relaxed">{feedbackReport.overallAssessment}</p>
-          </div>
-
-          {/* How You Came Across - Highlighted Section */}
-          <div className="bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200 rounded-2xl p-8">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-6 h-6 bg-purple-600 rounded-full flex items-center justify-center">
-                <Mic className="w-3 h-3 text-white" />
-              </div>
-              <h2 className="text-xl font-semibold text-purple-900">How You Came Across</h2>
-            </div>
-            <p className="text-purple-800 text-lg font-medium leading-relaxed">
-              {feedbackReport.howYouCameAcross}
-            </p>
-            {audioAnalysis && (
-              <div className="mt-4 px-4 py-2 bg-white/60 rounded-lg border border-purple-200">
-                <p className="text-sm text-purple-700">
-                  Primary emotion detected: <span className="font-medium">{audioAnalysis.primaryEmotion}</span> 
-                  <span className="text-purple-600 ml-1">
-                    ({Math.round(audioAnalysis.confidence * 100)}% confidence)
-                  </span>
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* What Worked */}
-          <div className="bg-card border border-border rounded-2xl p-8">
-            <h2 className="text-xl font-semibold mb-4 text-green-700">What Worked</h2>
-            <ul className="space-y-3">
-              {feedbackReport.whatWorked.map((item, i) => (
-                <li key={i} className="flex items-start gap-3">
-                  <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-green-600 text-sm">✓</span>
-                  </div>
-                  <p className="text-muted-foreground">{item}</p>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Opportunities */}
-          <div className="bg-card border border-border rounded-2xl p-8">
-            <h2 className="text-xl font-semibold mb-4 text-orange-700">Opportunities</h2>
-            <ul className="space-y-3">
-              {feedbackReport.opportunities.map((item, i) => (
-                <li key={i} className="flex items-start gap-3">
-                  <div className="w-5 h-5 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-orange-600 text-sm">↗</span>
-                  </div>
-                  <p className="text-muted-foreground">{item}</p>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Replay Moment */}
-          <div className="bg-card border border-border rounded-2xl p-8">
-            <h2 className="text-xl font-semibold mb-6">Replay Moment</h2>
-            <div className="space-y-6">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-2">What you said</p>
-                <p className="p-4 bg-secondary rounded-xl text-sm leading-relaxed">
-                  "{feedbackReport.replayMoment.originalMoment}"
-                </p>
-              </div>
-
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-2">How you likely sounded</p>
-                <p className="p-4 bg-orange-50 border border-orange-200 rounded-xl text-sm leading-relaxed text-orange-800">
-                  {feedbackReport.replayMoment.howYouLikelySounded}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-2">How it may have landed</p>
-                <p className="p-4 bg-gray-50 border border-gray-200 rounded-xl text-sm leading-relaxed text-gray-700">
-                  {feedbackReport.replayMoment.howItMayHaveLanded}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-2">Stronger version</p>
-                <p className="p-4 bg-green-50 border-2 border-green-200 rounded-xl text-sm leading-relaxed text-green-800 font-medium">
-                  "{feedbackReport.replayMoment.strongerVersion}"
-                </p>
-              </div>
-
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-2">Delivery tip</p>
-                <p className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-sm leading-relaxed text-blue-800">
-                  💡 {feedbackReport.replayMoment.deliveryTip}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex flex-col gap-4">
-            <Button 
-              onClick={handleRunAgain} 
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-6 text-lg"
-            >
-              <Play className="w-5 h-5 mr-2" />
-              Run it again
-            </Button>
-            
-            <div className="flex gap-4">
-              <Button onClick={handleViewConversation} variant="outline" className="flex-1">
-                View Conversation
-              </Button>
-              <Button onClick={handleBackHome} variant="outline" className="flex-1">
-                <Home className="w-4 h-4 mr-2" />
-                Back Home
-              </Button>
-            </div>
-          </div>
-        </motion.div>
+    <ScreenContainer className="flex flex-col">
+      {/* Quiet scenario label */}
+      <div style={{ padding: '28px 24px 0' }}>
+        <button onClick={openHistoryPanel} className="text-left" aria-label="Sessions">
+          <span
+            className="font-body text-r-text-secondary block truncate"
+            style={{ fontSize: 14, fontWeight: 500, letterSpacing: '-0.005em' }}
+          >
+            {scenarioLabel}
+          </span>
+        </button>
       </div>
-    </div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+        className="flex-1 overflow-y-auto"
+        style={{ padding: '28px 24px 40px' }}
+      >
+        <h1
+          className="font-display text-r-text-primary"
+          style={{ fontSize: 30, fontWeight: 400, lineHeight: 1.1, letterSpacing: '-0.018em', marginBottom: 36 }}
+        >
+          Here's your debrief.
+        </h1>
+
+        <DebriefSection title="Overall Assessment">
+          {feedbackReport.overallAssessment}
+        </DebriefSection>
+
+        <DebriefSection title="How you came across">
+          {feedbackReport.howYouCameAcross}
+        </DebriefSection>
+
+        <DebriefSection title="What worked">
+          <CheckList items={feedbackReport.whatWorked} />
+        </DebriefSection>
+
+        <DebriefSection title="Opportunities">
+          <CheckList items={feedbackReport.opportunities} />
+        </DebriefSection>
+      </motion.div>
+
+      {/* Run it again */}
+      <div style={{ padding: '0 24px calc(24px + env(safe-area-inset-bottom))' }}>
+        <PrimaryCTA onClick={() => navigate(`/conversation/${sessionId}`)}>
+          Run it again?
+        </PrimaryCTA>
+      </div>
+    </ScreenContainer>
   );
 }

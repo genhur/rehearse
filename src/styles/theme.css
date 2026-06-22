@@ -2,8 +2,8 @@
 
 :root {
   --font-size: 16px;
-  --background: #f8f8f7;
-  --foreground: #1a1a1a;
+  --background: #fbf3ea;
+  --foreground: #021e3b;
   --card: #ffffff;
   --card-foreground: #1a1a1a;
   --popover: #ffffff;
@@ -32,11 +32,13 @@
   --chart-5: #8b5cf6;
   --radius: 0.75rem;
 
-  /* Rehearse Design System — Colors */
-  --r-bg: #181818;
-  --r-surface: #222222;
-  --r-text-primary: #f3f3f3;
-  --r-text-secondary: rgba(243, 243, 243, 0.5);
+  /* Rehearse Design System — Colors (light editorial redesign) */
+  --r-ink: #021e3b;                            /* deep navy ink — primary text */
+  --r-bg: #fbf3ea;                             /* ivory base (gradient renders on top) */
+  --r-surface: rgba(255, 255, 255, 0.55);      /* translucent surface */
+  --r-text-primary: #021e3b;
+  --r-text-secondary: rgba(2, 30, 59, 0.52);   /* muted navy */
+  --r-text-tertiary: rgba(2, 30, 59, 0.34);    /* faint navy (labels, fading items) */
   --r-accent-purple: #833EF2;
   --r-accent-blue: #3E5BF2;
   --r-accent-green: #234A3B;
@@ -45,9 +47,21 @@
   --r-accent-yellow: #DDCF50;
   --r-accent-white: #F9F4F6;
   --r-accent-navy: #132DB3;
-  --r-cta-bg: #FFFFFF;
-  --r-cta-text: #25281A;
-  --r-user-bubble: #262626;
+  --r-cta-bg: rgba(255, 255, 255, 0.5);        /* translucent pill */
+  --r-cta-border: rgba(2, 30, 59, 0.12);
+  --r-cta-text: #021e3b;
+  --r-user-bubble: transparent;
+  --r-hairline: rgba(2, 30, 59, 0.1);          /* hairline dividers */
+
+  /* Ambient gradient palette */
+  --grad-ivory: #fff5e7;
+  --grad-peach: #fed7c0;
+  --grad-blush: #f6d4cf;
+  --grad-coral: #febfab;
+  --grad-lavender: #c7c8d8;
+  --grad-periwinkle: #d0cbf5;
+  --grad-mauve: #ecdfe3;
+  --grad-near-white: #f9f9f9;
 
   /* Rehearse Design System — Border Radius */
   --r-radius-sm: 4px;
@@ -136,8 +150,12 @@
   /* Rehearse Design System — Colors */
   --color-r-bg: var(--r-bg);
   --color-r-surface: var(--r-surface);
+  --color-r-ink: var(--r-ink);
   --color-r-text-primary: var(--r-text-primary);
   --color-r-text-secondary: var(--r-text-secondary);
+  --color-r-text-tertiary: var(--r-text-tertiary);
+  --color-r-hairline: var(--r-hairline);
+  --color-r-cta-border: var(--r-cta-border);
   --color-r-accent-purple: var(--r-accent-purple);
   --color-r-accent-blue: var(--r-accent-blue);
   --color-r-accent-green: var(--r-accent-green);
@@ -151,9 +169,9 @@
   --color-r-user-bubble: var(--r-user-bubble);
 
   /* Rehearse Design System — Typography */
-  --font-display: 'Newsreader', serif;
-  --font-body: 'Geist', sans-serif;
-  --font-geist: 'Geist Mono', monospace;
+  --font-display: 'Ivar Text', 'Newsreader', Georgia, serif;
+  --font-body: 'Founders Grotesk', -apple-system, system-ui, sans-serif;
+  --font-geist: 'Founders Grotesk', -apple-system, system-ui, sans-serif;
 
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);

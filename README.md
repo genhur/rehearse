@@ -6,7 +6,7 @@ Solo project: design, product, and build. Won **Most Useful** at the Rebuild × 
 
 Design WIP. Mobile web/app for demo coming soon.
 
-<img width="854" height="268" alt="Screenshot 2026-06-22 at 10 13 14 AM" src="https://github.com/user-attachments/assets/66b44ee0-8471-4ea2-a429-15cb9b5ebc7a" />
+<img width="954" height="296" alt="Screenshot 2026-06-22 at 10 15 40 AM" src="https://github.com/user-attachments/assets/0ee35174-a564-4d77-b85f-a98373777462" />
 
 ---
 

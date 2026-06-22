@@ -4,7 +4,7 @@
 
 Solo project: design, product, and build. Won **Most Useful** at the Rebuild × ElevenLabs hackathon.
 
-Design WIP. Polished mobile web/app coming soon.
+Design WIP. Mobile web/app for demo coming soon.
 
 <img width="870" height="273" alt="Screenshot 2026-06-22 at 10 01 12 AM" src="https://github.com/user-attachments/assets/13515692-6ffc-4a78-8be3-33f4d514a606" />
 

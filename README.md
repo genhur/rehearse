@@ -43,9 +43,6 @@ ElevenLabs Conversational AI for the real-time voice layer, with React/TypeScrip
 * Local session persistence for conversation history and reports
 * LLM-powered conversation simulation and feedback generation
 
-## Built For
-
-Rebuild X ElevenLabs Hackathon 2026
 
 
 

@@ -6,10 +6,6 @@ Solo project: design, product, and build. Won **Most Useful** at the Rebuild × 
 
 Design WIP. Mobile web/app for demo coming soon.
 
-<img width="778" height="242" alt="Screenshot 2026-06-22 at 11 04 14 AM" src="https://github.com/user-attachments/assets/868826a1-53de-4c64-ae79-fb269fda5f2c" />
-
-
-
 ---
 
 High-stakes interpersonal skills, like conflict, boundaries, hard feedback, asking for what you want, have no flight simulator. You learn them by failing live, on the people who matter, and you may not get another chance. Rehearse is the flight simulator. Difficult conversations are the first domain; the underlying idea is creating reps where reps didn't exist.
